@@ -1,25 +1,26 @@
+-- Daniel Bäckström (911104-0078)
 entrypoints Program ;
 
 -- Programs
 Prog.           Program  ::= [Def] ;
-terminator      Def "" ;
+terminator Def "" ;
 
 -- Definitions
 DFun.           Def ::= Fun ;
+DInlFun.        Def ::= "inline" Fun ;
 DTDef.          Def ::= TDef ";" ;
-DVar.           Def ::= Var ";" ;
-DStruct.        Def ::= Str ";" ;
+DVar.           Def ::= StmDec ";" ;
+DStruct.        Def ::= Struct ";" ;
 DUsing.         Def ::= "using" QConst ";" ;
-DInline.        Def ::= "inline" Fun ;
 
 -- Functions
-FProto.         Fun ::= Type Id "(" [Arg] ")" ";" ;
-FDef.           Fun ::= Type Id "(" [Arg] ")" "{" [Stm] "}" ;
-separator Arg "," ;
+FProto.         Fun ::= Type Id "(" [ArgDec] ")" ";" ;
+FDef.           Fun ::= Type Id "(" [ArgDec] ")" "{" [Stm] "}" ;
+separator ArgDec "," ;
 
 -- Typedefs and structs
 Typedef.        TDef ::= "typedef" Type Id ;
-Struct.         Str  ::= "struct" Id "{" [Dec] "}" ;
+Structure.      Struct  ::= "struct" Id "{" [Dec] "}" ;
 terminator Dec ";" ;
 
 -- General Declarations
@@ -28,82 +29,87 @@ DecConst.       Dec ::= "const" Type Id ;
 DecInit.        Dec ::= Type Id "=" Exp ;
 DecInitConst.   Dec ::= "const" Type Id "=" Exp ;
 
--- Function arguments
-ADec.           Arg ::= Dec ;
-ANoname.        Arg ::= Type ;
-ANonameConst.   Arg ::= "const" Type ;
+-- Function argument declarations (name optional)
+DecArg.         ArgDec ::= Dec ;
+DecArgNoName.   ArgDec ::= Type ;
+DecArgCNoName.  ArgDec ::= "const" Type ;
 
--- Variable declarations
-VDec.           Var ::= Dec ;
-VMult.          Var ::= Type Id "," [Id];
-separator nonempty  Id "," ;
+-- Statement variable declarations (multiple variables allowed)
+DecVar.         StmDec ::= Dec ;
+DecMultVar.     StmDec ::= Type Id "," [Id];
+separator nonempty Id "," ;
 
 -- Statements
-SExpr.          Stm ::= Exp ";" ;
-SVar.           Stm ::= Var ";" ;
-SRet.           Stm ::= "return" Exp ";" ;
-SBlock.         Stm ::= "{" [Stm] "}" ;
-SWhile.         Stm ::= "while" "(" Exp ")" Stm ;
-SDoWhile.       Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
-SFor.           Stm ::= "for" "(" Var ";" Exp ";" Exp ")" Stm ;
-STDef.          Stm ::= TDef ";" ;
-SStruct.        Stm ::= Str ";" ;
-SIf.            Stm ::= "if" "(" Exp ")" Stm ;
-SIfElse.        Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
+SExpr.    Stm ::= Exp ";" ;
+SStmDec.  Stm ::= StmDec ";" ;
+SReturn.  Stm ::= "return" Exp ";" ;
+SWhile.   Stm ::= "while" "(" Exp ")" Stm ;
+SDoWhile. Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
+SFor.     Stm ::= "for" "(" StmDec ";" Exp ";" Exp ")" Stm ;
+SIf.      Stm ::= "if" "(" Exp ")" Stm ;
+SIfElse.  Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
+SBlock.   Stm ::= "{" [Stm] "}" ;
+STDef.    Stm ::= TDef ";" ;
+SStruct.  Stm ::= Struct ";" ;
 terminator Stm "" ;
 
 -- Expressions
-EInt.           Exp16 ::= Integer ;
-EDbl.           Exp16 ::= Double ;
-EChar.          Exp16 ::= Char ;
-EStrLit.        Exp16 ::= [String] ;
-EConst.         Exp15 ::= QConst ;
-EIndex.         Exp15 ::= Id "[" Exp "]" ;
-EFunCall.       Exp15 ::= Id "("[Exp]")" ;
-EStrDot.        Exp14 ::= Exp14"."Exp15 ;
-EStrArr.        Exp14 ::= Exp14"->"Exp15 ;
-EPostInc.       Exp14 ::= Exp15 "++" ;
-EDeref.         Exp14 ::= "*" Exp15 ;
-EPreInc.        Exp13 ::= "++" Exp14 ;
-ENegate.        Exp13  ::= "!" Exp14;
-EMul.           Exp12 ::= Exp12 "*"  Exp13 ;
-EDiv.           Exp12 ::= Exp12 "/"  Exp13 ;
-EMod.           Exp12 ::= Exp12 "%"  Exp13 ;
-EAdd.           Exp11 ::= Exp11 "+"  Exp12 ;
-ESub.           Exp11 ::= Exp11 "-"  Exp12 ;
-ELShift.        Exp10 ::= Exp10 "<<" Exp11 ;
-ERShift.        Exp10 ::= Exp11 ">>" Exp10 ;
-ELt.            Exp9  ::= Exp9  "<"  Exp10 ;
-EGt.            Exp9  ::= Exp9  ">"  Exp10 ;
-ELtEq.          Exp9  ::= Exp9  "<=" Exp10 ;
-EGtEq.          Exp9  ::= Exp9  ">=" Exp10 ;
-EEqual.         Exp8  ::= Exp8  "==" Exp9 ;
-EIneq.          Exp8  ::= Exp8  "!=" Exp9 ;
-EAnd.           Exp4  ::= Exp4  "&&" Exp5 ;
-EOr.            Exp3  ::= Exp3  "||" Exp4 ;
-EAssign.        Exp2  ::= Exp3  "="  Exp2 ;
-EAssignInc.     Exp2  ::= Exp3  "+=" Exp2 ;
-EAssignDec.     Exp2  ::= Exp3  "-=" Exp2 ;
-ETernary.       Exp2  ::= Exp3  "?"  Exp3 ":" Exp3 ;
-EThrtow.        Exp1  ::= "throw" Exp2 ;
+EInt.     Exp16  ::= Integer ;
+EDouble.  Exp16  ::= Double ;
+EChar.    Exp16  ::= Char ;
+EString.  Exp16  ::= [String] ;
+ETrue.    Exp16  ::= "true";
+EFalse.   Exp16  ::= "false";
+EConst.   Exp16  ::= QConst ;
+EIndex.   Exp15  ::= Id "[" Exp "]" ;
+ECall.    Exp15  ::= Id "(" [Exp] ")" ;
+EMem.     Exp14  ::= Exp14 "." Exp15 ;
+EFAccs.   Exp14  ::= Exp14 "->" Exp15 ;
+EPostInc. Exp14  ::= Exp15 "++" ;
+EPostDec. Exp14  ::= Exp15 "--" ;
+EPreInc.  Exp13  ::= "++" Exp14 ;
+EPreDec.  Exp13  ::= "--" Exp14 ;
+EDeref.   Exp13  ::= "*" Exp14 ;
+ENot.     Exp13  ::= "!" Exp14 ;
+ENeg.     Exp13  ::= "-" Exp14 ;
+EMul.     Exp12  ::= Exp12 "*" Exp13 ;
+EDiv.     Exp12  ::= Exp12 "/" Exp13 ;
+EMod.     Exp12  ::= Exp12 "%" Exp13 ;
+EAdd.     Exp11  ::= Exp11 "+" Exp12 ;
+ESub.     Exp11  ::= Exp11 "-" Exp12 ;
+EShiftL.  Exp10  ::= Exp10 "<<" Exp11 ;
+EShiftR.  Exp10  ::= Exp10 ">>" Exp11 ;
+EGt.      Exp9   ::= Exp9 ">" Exp10 ;
+ELt.      Exp9   ::= Exp9 "<" Exp10 ;
+ELeq.     Exp9   ::= Exp9 "<=" Exp10 ;
+EGeq.     Exp9   ::= Exp9 ">=" Exp10 ;
+ENeq.     Exp8   ::= Exp8 "!=" Exp9 ;
+EEq.      Exp8   ::= Exp8 "==" Exp9 ;
+EAnd.     Exp4   ::= Exp4 "&&" Exp5 ;
+EOr.      Exp3   ::= Exp3 "||" Exp4 ;
+EAss.     Exp2   ::= Exp3 "=" Exp2;
+EAssDec.  Exp2   ::= Exp3 "-=" Exp2 ;
+EAssInc.  Exp2   ::= Exp3 "+=" Exp2 ;
+EIfElse.  Exp2   ::= Exp3 "?" Exp2 ":" Exp2 ;
+EThrow.   Exp1   ::= "throw" Exp2 ;
 separator Exp "," ;
 separator nonempty String "" ;
 coercions Exp 16 ;
 
 -- Constants and qualified constants
-CTempl.         Const  ::= Id"<"[Type]">" ;
-CId.            Const  ::= Id ;
-QCon.           QConst ::= [Const] ;
+CTempl.   Const  ::= Id"<"[Type]">" ;
+CId.      Const  ::= Id ;
+QCon.     QConst ::= [Const] ;
 separator nonempty Const "::" ;
 separator nonempty Type "," ;
 
 -- Types
-TVoid.          Type  ::= "void" ;
-TBool.          Type  ::= "bool" ;
-TInt.           Type  ::= "int" ;
-TDoube.         Type  ::= "double" ;
-TConst.         Type  ::= QConst ;
-TRef.           Type  ::= Type "&" ;
+TInt.     Type ::= "int" ;
+TDouble.  Type ::= "double" ;
+TVoid.    Type ::= "void" ;
+TBool.    Type ::= "bool" ;
+TConst.   Type ::= QConst ;
+TRef.     Type ::= Type "&" ;
 
 -- Custom identifier
 token Id (letter (letter | digit | '_')*) ;

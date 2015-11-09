@@ -13,20 +13,20 @@ data Program = Prog [Def]
 
 data Def
     = DFun Fun
+    | DInlFun Fun
     | DTDef TDef
-    | DVar Var
-    | DStruct Str
+    | DVar StmDec
+    | DStruct Struct
     | DUsing QConst
-    | DInline Fun
   deriving (Eq, Ord, Show, Read)
 
-data Fun = FProto Type Id [Arg] | FDef Type Id [Arg] [Stm]
+data Fun = FProto Type Id [ArgDec] | FDef Type Id [ArgDec] [Stm]
   deriving (Eq, Ord, Show, Read)
 
 data TDef = Typedef Type Id
   deriving (Eq, Ord, Show, Read)
 
-data Str = Struct Id [Dec]
+data Struct = Structure Id [Dec]
   deriving (Eq, Ord, Show, Read)
 
 data Dec
@@ -36,60 +36,65 @@ data Dec
     | DecInitConst Type Id Exp
   deriving (Eq, Ord, Show, Read)
 
-data Arg = ADec Dec | ANoname Type | ANonameConst Type
+data ArgDec = DecArg Dec | DecArgNoName Type | DecArgCNoName Type
   deriving (Eq, Ord, Show, Read)
 
-data Var = VDec Dec | VMult Type Id [Id]
+data StmDec = DecVar Dec | DecMultVar Type Id [Id]
   deriving (Eq, Ord, Show, Read)
 
 data Stm
     = SExpr Exp
-    | SVar Var
-    | SRet Exp
-    | SBlock [Stm]
+    | SStmDec StmDec
+    | SReturn Exp
     | SWhile Exp Stm
     | SDoWhile Stm Exp
-    | SFor Var Exp Exp Stm
-    | STDef TDef
-    | SStruct Str
+    | SFor StmDec Exp Exp Stm
     | SIf Exp Stm
     | SIfElse Exp Stm Stm
+    | SBlock [Stm]
+    | STDef TDef
+    | SStruct Struct
   deriving (Eq, Ord, Show, Read)
 
 data Exp
     = EInt Integer
-    | EDbl Double
+    | EDouble Double
     | EChar Char
-    | EStrLit [String]
+    | EString [String]
+    | ETrue
+    | EFalse
     | EConst QConst
     | EIndex Id Exp
-    | EFunCall Id [Exp]
-    | EStrDot Exp Exp
-    | EStrArr Exp Exp
+    | ECall Id [Exp]
+    | EMem Exp Exp
+    | EFAccs Exp Exp
     | EPostInc Exp
-    | EDeref Exp
+    | EPostDec Exp
     | EPreInc Exp
-    | ENegate Exp
+    | EPreDec Exp
+    | EDeref Exp
+    | ENot Exp
+    | ENeg Exp
     | EMul Exp Exp
     | EDiv Exp Exp
     | EMod Exp Exp
     | EAdd Exp Exp
     | ESub Exp Exp
-    | ELShift Exp Exp
-    | ERShift Exp Exp
-    | ELt Exp Exp
+    | EShiftL Exp Exp
+    | EShiftR Exp Exp
     | EGt Exp Exp
-    | ELtEq Exp Exp
-    | EGtEq Exp Exp
-    | EEqual Exp Exp
-    | EIneq Exp Exp
+    | ELt Exp Exp
+    | ELeq Exp Exp
+    | EGeq Exp Exp
+    | ENeq Exp Exp
+    | EEq Exp Exp
     | EAnd Exp Exp
     | EOr Exp Exp
-    | EAssign Exp Exp
-    | EAssignInc Exp Exp
-    | EAssignDec Exp Exp
-    | ETernary Exp Exp Exp
-    | EThrtow Exp
+    | EAss Exp Exp
+    | EAssDec Exp Exp
+    | EAssInc Exp Exp
+    | EIfElse Exp Exp Exp
+    | EThrow Exp
   deriving (Eq, Ord, Show, Read)
 
 data Const = CTempl Id [Type] | CId Id
@@ -99,6 +104,6 @@ data QConst = QCon [Const]
   deriving (Eq, Ord, Show, Read)
 
 data Type
-    = TVoid | TBool | TInt | TDoube | TConst QConst | TRef Type
+    = TInt | TDouble | TVoid | TBool | TConst QConst | TRef Type
   deriving (Eq, Ord, Show, Read)
 
