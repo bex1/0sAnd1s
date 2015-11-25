@@ -26,43 +26,46 @@ import ErrM
   '+=' { PT _ (TS _ 11) }
   ',' { PT _ (TS _ 12) }
   '-' { PT _ (TS _ 13) }
-  '-=' { PT _ (TS _ 14) }
-  '->' { PT _ (TS _ 15) }
-  '.' { PT _ (TS _ 16) }
-  '/' { PT _ (TS _ 17) }
-  ':' { PT _ (TS _ 18) }
-  '::' { PT _ (TS _ 19) }
-  ';' { PT _ (TS _ 20) }
-  '<' { PT _ (TS _ 21) }
-  '<<' { PT _ (TS _ 22) }
-  '<=' { PT _ (TS _ 23) }
-  '=' { PT _ (TS _ 24) }
-  '==' { PT _ (TS _ 25) }
-  '>' { PT _ (TS _ 26) }
-  '>=' { PT _ (TS _ 27) }
-  '>>' { PT _ (TS _ 28) }
-  '?' { PT _ (TS _ 29) }
-  '[' { PT _ (TS _ 30) }
-  ']' { PT _ (TS _ 31) }
-  'bool' { PT _ (TS _ 32) }
-  'const' { PT _ (TS _ 33) }
-  'do' { PT _ (TS _ 34) }
-  'double' { PT _ (TS _ 35) }
-  'else' { PT _ (TS _ 36) }
-  'for' { PT _ (TS _ 37) }
-  'if' { PT _ (TS _ 38) }
-  'inline' { PT _ (TS _ 39) }
-  'int' { PT _ (TS _ 40) }
-  'return' { PT _ (TS _ 41) }
-  'struct' { PT _ (TS _ 42) }
-  'throw' { PT _ (TS _ 43) }
-  'typedef' { PT _ (TS _ 44) }
-  'using' { PT _ (TS _ 45) }
-  'void' { PT _ (TS _ 46) }
-  'while' { PT _ (TS _ 47) }
-  '{' { PT _ (TS _ 48) }
-  '||' { PT _ (TS _ 49) }
-  '}' { PT _ (TS _ 50) }
+  '--' { PT _ (TS _ 14) }
+  '-=' { PT _ (TS _ 15) }
+  '->' { PT _ (TS _ 16) }
+  '.' { PT _ (TS _ 17) }
+  '/' { PT _ (TS _ 18) }
+  ':' { PT _ (TS _ 19) }
+  '::' { PT _ (TS _ 20) }
+  ';' { PT _ (TS _ 21) }
+  '<' { PT _ (TS _ 22) }
+  '<<' { PT _ (TS _ 23) }
+  '<=' { PT _ (TS _ 24) }
+  '=' { PT _ (TS _ 25) }
+  '==' { PT _ (TS _ 26) }
+  '>' { PT _ (TS _ 27) }
+  '>=' { PT _ (TS _ 28) }
+  '>>' { PT _ (TS _ 29) }
+  '?' { PT _ (TS _ 30) }
+  '[' { PT _ (TS _ 31) }
+  ']' { PT _ (TS _ 32) }
+  'bool' { PT _ (TS _ 33) }
+  'const' { PT _ (TS _ 34) }
+  'do' { PT _ (TS _ 35) }
+  'double' { PT _ (TS _ 36) }
+  'else' { PT _ (TS _ 37) }
+  'false' { PT _ (TS _ 38) }
+  'for' { PT _ (TS _ 39) }
+  'if' { PT _ (TS _ 40) }
+  'inline' { PT _ (TS _ 41) }
+  'int' { PT _ (TS _ 42) }
+  'return' { PT _ (TS _ 43) }
+  'struct' { PT _ (TS _ 44) }
+  'throw' { PT _ (TS _ 45) }
+  'true' { PT _ (TS _ 46) }
+  'typedef' { PT _ (TS _ 47) }
+  'using' { PT _ (TS _ 48) }
+  'void' { PT _ (TS _ 49) }
+  'while' { PT _ (TS _ 50) }
+  '{' { PT _ (TS _ 51) }
+  '||' { PT _ (TS _ 52) }
+  '}' { PT _ (TS _ 53) }
 
 L_integ  { PT _ (TI $$) }
 L_doubl  { PT _ (TD $$) }
@@ -85,22 +88,22 @@ ListDef :: { [Def] }
 ListDef : {- empty -} { [] } | ListDef Def { flip (:) $1 $2 }
 Def :: { Def }
 Def : Fun { AbsLab.DFun $1 }
+    | 'inline' Fun { AbsLab.DInlFun $2 }
     | TDef ';' { AbsLab.DTDef $1 }
-    | Var ';' { AbsLab.DVar $1 }
-    | Str ';' { AbsLab.DStruct $1 }
+    | StmDec ';' { AbsLab.DVar $1 }
+    | Struct ';' { AbsLab.DStruct $1 }
     | 'using' QConst ';' { AbsLab.DUsing $2 }
-    | 'inline' Fun { AbsLab.DInline $2 }
 Fun :: { Fun }
-Fun : Type Id '(' ListArg ')' ';' { AbsLab.FProto $1 $2 $4 }
-    | Type Id '(' ListArg ')' '{' ListStm '}' { AbsLab.FDef $1 $2 $4 (reverse $7) }
-ListArg :: { [Arg] }
-ListArg : {- empty -} { [] }
-        | Arg { (:[]) $1 }
-        | Arg ',' ListArg { (:) $1 $3 }
+Fun : Type Id '(' ListArgDec ')' ';' { AbsLab.FProto $1 $2 $4 }
+    | Type Id '(' ListArgDec ')' '{' ListStm '}' { AbsLab.FDef $1 $2 $4 (reverse $7) }
+ListArgDec :: { [ArgDec] }
+ListArgDec : {- empty -} { [] }
+           | ArgDec { (:[]) $1 }
+           | ArgDec ',' ListArgDec { (:) $1 $3 }
 TDef :: { TDef }
 TDef : 'typedef' Type Id { AbsLab.Typedef $2 $3 }
-Str :: { Str }
-Str : 'struct' Id '{' ListDec '}' { AbsLab.Struct $2 (reverse $4) }
+Struct :: { Struct }
+Struct : 'struct' Id '{' ListDec '}' { AbsLab.Structure $2 (reverse $4) }
 ListDec :: { [Dec] }
 ListDec : {- empty -} { [] } | ListDec Dec ';' { flip (:) $1 $2 }
 Dec :: { Dec }
@@ -108,49 +111,54 @@ Dec : Type Id { AbsLab.DecSingle $1 $2 }
     | 'const' Type Id { AbsLab.DecConst $2 $3 }
     | Type Id '=' Exp { AbsLab.DecInit $1 $2 $4 }
     | 'const' Type Id '=' Exp { AbsLab.DecInitConst $2 $3 $5 }
-Arg :: { Arg }
-Arg : Dec { AbsLab.ADec $1 }
-    | Type { AbsLab.ANoname $1 }
-    | 'const' Type { AbsLab.ANonameConst $2 }
-Var :: { Var }
-Var : Dec { AbsLab.VDec $1 }
-    | Type Id ',' ListId { AbsLab.VMult $1 $2 $4 }
+ArgDec :: { ArgDec }
+ArgDec : Dec { AbsLab.DecArg $1 }
+       | Type { AbsLab.DecArgNoName $1 }
+       | 'const' Type { AbsLab.DecArgCNoName $2 }
+StmDec :: { StmDec }
+StmDec : Dec { AbsLab.DecVar $1 }
+       | Type Id ',' ListId { AbsLab.DecMultVar $1 $2 $4 }
 ListId :: { [Id] }
 ListId : Id { (:[]) $1 } | Id ',' ListId { (:) $1 $3 }
 Stm :: { Stm }
 Stm : Exp ';' { AbsLab.SExpr $1 }
-    | Var ';' { AbsLab.SVar $1 }
-    | 'return' Exp ';' { AbsLab.SRet $2 }
-    | '{' ListStm '}' { AbsLab.SBlock (reverse $2) }
+    | StmDec ';' { AbsLab.SStmDec $1 }
+    | 'return' Exp ';' { AbsLab.SReturn $2 }
     | 'while' '(' Exp ')' Stm { AbsLab.SWhile $3 $5 }
     | 'do' Stm 'while' '(' Exp ')' ';' { AbsLab.SDoWhile $2 $5 }
-    | 'for' '(' Var ';' Exp ';' Exp ')' Stm { AbsLab.SFor $3 $5 $7 $9 }
-    | TDef ';' { AbsLab.STDef $1 }
-    | Str ';' { AbsLab.SStruct $1 }
+    | 'for' '(' StmDec ';' Exp ';' Exp ')' Stm { AbsLab.SFor $3 $5 $7 $9 }
     | 'if' '(' Exp ')' Stm { AbsLab.SIf $3 $5 }
     | 'if' '(' Exp ')' Stm 'else' Stm { AbsLab.SIfElse $3 $5 $7 }
+    | '{' ListStm '}' { AbsLab.SBlock (reverse $2) }
+    | TDef ';' { AbsLab.STDef $1 }
+    | Struct ';' { AbsLab.SStruct $1 }
 ListStm :: { [Stm] }
 ListStm : {- empty -} { [] } | ListStm Stm { flip (:) $1 $2 }
 Exp16 :: { Exp }
 Exp16 : Integer { AbsLab.EInt $1 }
-      | Double { AbsLab.EDbl $1 }
+      | Double { AbsLab.EDouble $1 }
       | Char { AbsLab.EChar $1 }
-      | ListString { AbsLab.EStrLit $1 }
+      | ListString { AbsLab.EString $1 }
+      | 'true' { AbsLab.ETrue }
+      | 'false' { AbsLab.EFalse }
+      | QConst { AbsLab.EConst $1 }
       | '(' Exp ')' { $2 }
 Exp15 :: { Exp }
-Exp15 : QConst { AbsLab.EConst $1 }
-      | Id '[' Exp ']' { AbsLab.EIndex $1 $3 }
-      | Id '(' ListExp ')' { AbsLab.EFunCall $1 $3 }
+Exp15 : Id '[' Exp ']' { AbsLab.EIndex $1 $3 }
+      | Id '(' ListExp ')' { AbsLab.ECall $1 $3 }
       | Exp16 { $1 }
 Exp14 :: { Exp }
-Exp14 : Exp14 '.' Exp15 { AbsLab.EStrDot $1 $3 }
-      | Exp14 '->' Exp15 { AbsLab.EStrArr $1 $3 }
+Exp14 : Exp14 '.' Exp15 { AbsLab.EMem $1 $3 }
+      | Exp14 '->' Exp15 { AbsLab.EFAccs $1 $3 }
       | Exp15 '++' { AbsLab.EPostInc $1 }
-      | '*' Exp15 { AbsLab.EDeref $2 }
+      | Exp15 '--' { AbsLab.EPostDec $1 }
       | Exp15 { $1 }
 Exp13 :: { Exp }
 Exp13 : '++' Exp14 { AbsLab.EPreInc $2 }
-      | '!' Exp14 { AbsLab.ENegate $2 }
+      | '--' Exp14 { AbsLab.EPreDec $2 }
+      | '*' Exp14 { AbsLab.EDeref $2 }
+      | '!' Exp14 { AbsLab.ENot $2 }
+      | '-' Exp14 { AbsLab.ENeg $2 }
       | Exp14 { $1 }
 Exp12 :: { Exp }
 Exp12 : Exp12 '*' Exp13 { AbsLab.EMul $1 $3 }
@@ -162,31 +170,31 @@ Exp11 : Exp11 '+' Exp12 { AbsLab.EAdd $1 $3 }
       | Exp11 '-' Exp12 { AbsLab.ESub $1 $3 }
       | Exp12 { $1 }
 Exp10 :: { Exp }
-Exp10 : Exp10 '<<' Exp11 { AbsLab.ELShift $1 $3 }
-      | Exp11 '>>' Exp10 { AbsLab.ERShift $1 $3 }
+Exp10 : Exp10 '<<' Exp11 { AbsLab.EShiftL $1 $3 }
+      | Exp10 '>>' Exp11 { AbsLab.EShiftR $1 $3 }
       | Exp11 { $1 }
 Exp9 :: { Exp }
-Exp9 : Exp9 '<' Exp10 { AbsLab.ELt $1 $3 }
-     | Exp9 '>' Exp10 { AbsLab.EGt $1 $3 }
-     | Exp9 '<=' Exp10 { AbsLab.ELtEq $1 $3 }
-     | Exp9 '>=' Exp10 { AbsLab.EGtEq $1 $3 }
+Exp9 : Exp9 '>' Exp10 { AbsLab.EGt $1 $3 }
+     | Exp9 '<' Exp10 { AbsLab.ELt $1 $3 }
+     | Exp9 '<=' Exp10 { AbsLab.ELeq $1 $3 }
+     | Exp9 '>=' Exp10 { AbsLab.EGeq $1 $3 }
      | Exp10 { $1 }
 Exp8 :: { Exp }
-Exp8 : Exp8 '==' Exp9 { AbsLab.EEqual $1 $3 }
-     | Exp8 '!=' Exp9 { AbsLab.EIneq $1 $3 }
+Exp8 : Exp8 '!=' Exp9 { AbsLab.ENeq $1 $3 }
+     | Exp8 '==' Exp9 { AbsLab.EEq $1 $3 }
      | Exp9 { $1 }
 Exp4 :: { Exp }
 Exp4 : Exp4 '&&' Exp5 { AbsLab.EAnd $1 $3 } | Exp5 { $1 }
 Exp3 :: { Exp }
 Exp3 : Exp3 '||' Exp4 { AbsLab.EOr $1 $3 } | Exp4 { $1 }
 Exp2 :: { Exp }
-Exp2 : Exp3 '=' Exp2 { AbsLab.EAssign $1 $3 }
-     | Exp3 '+=' Exp2 { AbsLab.EAssignInc $1 $3 }
-     | Exp3 '-=' Exp2 { AbsLab.EAssignDec $1 $3 }
-     | Exp3 '?' Exp3 ':' Exp3 { AbsLab.ETernary $1 $3 $5 }
+Exp2 : Exp3 '=' Exp2 { AbsLab.EAss $1 $3 }
+     | Exp3 '-=' Exp2 { AbsLab.EAssDec $1 $3 }
+     | Exp3 '+=' Exp2 { AbsLab.EAssInc $1 $3 }
+     | Exp3 '?' Exp2 ':' Exp2 { AbsLab.EIfElse $1 $3 $5 }
      | Exp3 { $1 }
 Exp1 :: { Exp }
-Exp1 : 'throw' Exp2 { AbsLab.EThrtow $2 } | Exp2 { $1 }
+Exp1 : 'throw' Exp2 { AbsLab.EThrow $2 } | Exp2 { $1 }
 ListExp :: { [Exp] }
 ListExp : {- empty -} { [] }
         | Exp { (:[]) $1 }
@@ -211,10 +219,10 @@ ListConst : Const { (:[]) $1 } | Const '::' ListConst { (:) $1 $3 }
 ListType :: { [Type] }
 ListType : Type { (:[]) $1 } | Type ',' ListType { (:) $1 $3 }
 Type :: { Type }
-Type : 'void' { AbsLab.TVoid }
+Type : 'int' { AbsLab.TInt }
+     | 'double' { AbsLab.TDouble }
+     | 'void' { AbsLab.TVoid }
      | 'bool' { AbsLab.TBool }
-     | 'int' { AbsLab.TInt }
-     | 'double' { AbsLab.TDoube }
      | QConst { AbsLab.TConst $1 }
      | Type '&' { AbsLab.TRef $1 }
 {

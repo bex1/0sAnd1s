@@ -20,7 +20,7 @@ $i = [$l $d _ ']          -- identifier character
 $u = [\0-\255]          -- universal: any character
 
 @rsyms =    -- symbols and non-identifier-like reserved words
-   \; | \( | \) | \{ | \} | \, | \= | \[ | \] | \. | \- \> | \+ \+ | \* | \! | \/ | \% | \+ | \- | \< \< | \> \> | \< | \> | \< \= | \> \= | \= \= | \! \= | \& \& | \| \| | \+ \= | \- \= | \? | \: | \: \: | \&
+   \; | \( | \) | \{ | \} | \, | \= | \[ | \] | \. | \- \> | \+ \+ | \- \- | \* | \! | \- | \/ | \% | \+ | \< \< | \> \> | \> | \< | \< \= | \> \= | \! \= | \= \= | \& \& | \| \| | \- \= | \+ \= | \? | \: | \: \: | \&
 
 :-
 "//" [.]* ; -- Toss single line comments
@@ -101,7 +101,7 @@ eitherResIdent tv s = treeFind resWords
                               | s == a = t
 
 resWords :: BTree
-resWords = b ">" 26 (b "-" 13 (b ")" 7 (b "&" 4 (b "!=" 2 (b "!" 1 N N) (b "%" 3 N N)) (b "(" 6 (b "&&" 5 N N) N)) (b "++" 10 (b "+" 9 (b "*" 8 N N) N) (b "," 12 (b "+=" 11 N N) N))) (b ";" 20 (b "/" 17 (b "->" 15 (b "-=" 14 N N) (b "." 16 N N)) (b "::" 19 (b ":" 18 N N) N)) (b "<=" 23 (b "<<" 22 (b "<" 21 N N) N) (b "==" 25 (b "=" 24 N N) N)))) (b "inline" 39 (b "const" 33 (b "[" 30 (b ">>" 28 (b ">=" 27 N N) (b "?" 29 N N)) (b "bool" 32 (b "]" 31 N N) N)) (b "else" 36 (b "double" 35 (b "do" 34 N N) N) (b "if" 38 (b "for" 37 N N) N))) (b "using" 45 (b "struct" 42 (b "return" 41 (b "int" 40 N N) N) (b "typedef" 44 (b "throw" 43 N N) N)) (b "{" 48 (b "while" 47 (b "void" 46 N N) N) (b "}" 50 (b "||" 49 N N) N))))
+resWords = b ">" 27 (b "--" 14 (b ")" 7 (b "&" 4 (b "!=" 2 (b "!" 1 N N) (b "%" 3 N N)) (b "(" 6 (b "&&" 5 N N) N)) (b "+=" 11 (b "+" 9 (b "*" 8 N N) (b "++" 10 N N)) (b "-" 13 (b "," 12 N N) N))) (b ";" 21 (b "/" 18 (b "->" 16 (b "-=" 15 N N) (b "." 17 N N)) (b "::" 20 (b ":" 19 N N) N)) (b "<=" 24 (b "<<" 23 (b "<" 22 N N) N) (b "==" 26 (b "=" 25 N N) N)))) (b "inline" 41 (b "const" 34 (b "[" 31 (b ">>" 29 (b ">=" 28 N N) (b "?" 30 N N)) (b "bool" 33 (b "]" 32 N N) N)) (b "false" 38 (b "double" 36 (b "do" 35 N N) (b "else" 37 N N)) (b "if" 40 (b "for" 39 N N) N))) (b "using" 48 (b "throw" 45 (b "return" 43 (b "int" 42 N N) (b "struct" 44 N N)) (b "typedef" 47 (b "true" 46 N N) N)) (b "{" 51 (b "while" 50 (b "void" 49 N N) N) (b "}" 53 (b "||" 52 N N) N))))
    where b s n = let bs = id s
                   in B bs (TS bs n)
 
