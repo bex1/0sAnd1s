@@ -68,38 +68,10 @@ evaluateExpression environment expression =
           let environment''' = foldl (\expression' (argumentId,argumentValue) -> updateVariableValue (addVariableToCurrentContext expression' argumentId) argumentId argumentValue) environment'' arguments
           (resultingValue, resultingEnvironment) <- executeFunction environment''' functionDefinition
           return (resultingValue, leaveScope resultingEnvironment)
-      EPostIncr (EId variableId) ->
-        do
-          (value, environment') <- evaluateExpression environment (EId variableId)
-          let newValue = case value of
-                VInt integer -> VInt $ integer + 1
-                VDouble double -> VDouble $ double + 1
-          let environment'' = updateVariableValue environment' variableId newValue
-          return (value, environment'')
-      EPostDecr (EId variableId) ->
-        do
-          (value, environment') <- evaluateExpression environment (EId variableId)
-          let newValue = case value of
-                VInt integer -> VInt $ integer - 1
-                VDouble double -> VDouble $ double - 1
-          let environment'' = updateVariableValue environment' variableId newValue
-          return (value, environment'')
-      EPreIncr (EId variableId) ->
-        do
-          (value, environment') <- evaluateExpression environment (EId variableId)
-          let newValue = case value of
-                VInt integer -> VInt $ integer + 1
-                VDouble double -> VDouble $ double + 1
-          let environment'' = updateVariableValue environment' variableId newValue
-          return (newValue, environment'')
-      EPreDecr (EId variableId) ->
-        do
-          (value, environment') <- evaluateExpression environment (EId variableId)
-          let newValue = case value of
-                VInt integer -> VInt $ integer - 1
-                VDouble double -> VDouble $ double - 1
-          let environment'' = updateVariableValue environment' variableId newValue
-          return (newValue, environment'')
+      EPostIncr (EId variableId)        -> evaluateUnaryPostExpression environment variableId (+) (+)
+      EPostDecr (EId variableId)        -> evaluateUnaryPostExpression environment variableId (-) (-)
+      EPreIncr (EId variableId)         -> evaluateUnaryPreExpression environment variableId (+) (+)
+      EPreDecr (EId variableId)         -> evaluateUnaryPreExpression environment variableId (-) (-)
       ETimes expression1 expression2    -> evaluteBinaryNumberExpression environment expression1 expression2 (*) (*)
       EDiv expression1 expression2      -> evaluteBinaryNumberExpression environment expression1 expression2 div (/)
       EPlus expression1 expression2     -> evaluteBinaryNumberExpression environment expression1 expression2 (+) (+)
@@ -148,6 +120,23 @@ evaluateExpression environment expression =
         case (value1,value2) of
           (VInt integer1, VInt integer2)     -> return (VInt (integer1 `integerOperator` integer2), environment'')
           (VDouble double1, VDouble double2) -> return (VDouble (double1 `doubleOperator` double2), environment'')
+    evaluateUnaryPostExpression environment variableId integerOperator doubleOperator =
+      do
+        (value, environment') <- evaluateExpression environment (EId variableId)
+        (_, environment'') <- evaluateNewUnaryExpressionValue environment' variableId value integerOperator doubleOperator
+        return (value, environment'')
+    evaluateUnaryPreExpression environment variableId integerOperator doubleOperator =
+      do
+        (value, environment') <- evaluateExpression environment (EId variableId)
+        (newValue, environment'') <- evaluateNewUnaryExpressionValue environment' variableId value integerOperator doubleOperator
+        return (newValue, environment'')
+    evaluateNewUnaryExpressionValue environment variableId value integerOperator doubleOperator =
+      do
+        let newValue = case value of
+              VInt integer -> VInt $ integer `integerOperator` 1
+              VDouble double -> VDouble $ double `doubleOperator` 1
+        let environment' = updateVariableValue environment variableId newValue
+        return (newValue, environment')
 
 
 executeFunction :: Environment -> Def -> IO (Value, Environment)
