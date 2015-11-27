@@ -171,40 +171,39 @@ executeFunction environment (DFun _ _ _ ([])) = return (VVoid, environment)
 executeFunction environment (DFun returnType functionId argumentDeclarations (statement:restStatements)) =
   do
     (resultValue, environment') <- executeStatement environment statement
-    if resultValue == VVoid then
-      executeFunction environment' (DFun returnType functionId argumentDeclarations restStatements)
-    else
-      return (resultValue, environment')
+    case resultValue of
+      Nothing -> executeFunction environment' (DFun returnType functionId argumentDeclarations restStatements)
+      Just resultValue -> return (resultValue, environment')
 
-executeStatement :: Environment -> Stm -> IO (Value, Environment)
+executeStatement :: Environment -> Stm -> IO (Maybe Value, Environment)
 executeStatement environment statement = do
   case statement of
     SExp expression ->
       do
         (_, environment') <- evaluateExpression environment expression
-        return (VVoid, environment')
-    SDecls _ variableIds -> return $ (VVoid, foldl (addVariableToCurrentContext) environment variableIds)
+        return (Nothing, environment')
+    SDecls _ variableIds -> return $ (Nothing, foldl (addVariableToCurrentContext) environment variableIds)
     SInit _ variableId expression ->
       do
         let environment' = addVariableToCurrentContext environment variableId
         (value, environment'') <- evaluateExpression environment' expression
-        return $ (VVoid, updateVariableValue environment'' variableId value)
+        return $ (Nothing, updateVariableValue environment'' variableId value)
     SReturn returnExpression ->
       do
         (resultValue, environment') <- evaluateExpression environment returnExpression
-        return (resultValue, environment')
+        return (Just resultValue, environment')
     SWhile conditionExpression statement' ->
       do
         (value, environment') <- evaluateExpression environment conditionExpression
         if value == VBool True then
           do
-            (resultValue, environment'') <- executeStatement environment' statement'
-            if resultValue == VVoid then
+            (result, environment'') <- executeStatement environment' statement'
+            if result == Nothing then
               executeStatement environment'' statement
             else
-              return (resultValue, environment'')
+              return (result, environment'')
         else
-          return (VVoid, environment')
+          return (Nothing, environment')
     SBlock statements ->
       do
         (resultValue, environment') <- executeStatements (enterScope environment) statements
@@ -217,15 +216,15 @@ executeStatement environment statement = do
         else
           executeStatement environment' statement2
 
-executeStatements :: Environment -> [Stm] -> IO (Value, Environment)
-executeStatements environment [] = return (VVoid, environment)
+executeStatements :: Environment -> [Stm] -> IO (Maybe Value, Environment)
+executeStatements environment [] = return (Nothing, environment)
 executeStatements environment (statement:statements) =
   do
-    (resultValue, environment') <- executeStatement environment statement
-    if resultValue == VVoid then
+    (result, environment') <- executeStatement environment statement
+    if result == Nothing then
       executeStatements environment' statements
     else
-      return (resultValue, environment')
+      return (result, environment')
 
 addVariableToCurrentContext :: Environment -> Id -> Environment
 addVariableToCurrentContext (functionDefinitions, (context:restContexts)) variableId = (functionDefinitions, (Map.insert variableId VUndef context:restContexts))
