@@ -4,6 +4,7 @@ import AbsCPP
 import PrintCPP
 
 import Control.Monad
+import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -42,12 +43,12 @@ evaluateExpression environment expression =
       EApp (Id "printInt") expression' ->
         do
           (VInt integer, environment') <- evaluateExpression environment (head expression')
-          putStrLn $ show integer
+          print integer
           return (VVoid, environment')
       EApp (Id "printDouble") expression' ->
         do
           (VDouble double, environment') <- evaluateExpression environment (head expression')
-          putStrLn $ show double
+          print double
           return (VVoid, environment')
       EApp (Id "readInt") _ ->
         do
@@ -73,7 +74,7 @@ evaluateExpression environment expression =
           let newValue = case value of
                 VInt integer -> VInt $ integer + 1
                 VDouble double -> VDouble $ double + 1
-          let environment'' = updateVariableValue environment' variableId (newValue)
+          let environment'' = updateVariableValue environment' variableId newValue
           return (value, environment'')
       EPostDecr (EId variableId) ->
         do
@@ -81,7 +82,7 @@ evaluateExpression environment expression =
           let newValue = case value of
                 VInt integer -> VInt $ integer - 1
                 VDouble double -> VDouble $ double - 1
-          let environment'' = updateVariableValue environment' variableId (newValue)
+          let environment'' = updateVariableValue environment' variableId newValue
           return (value, environment'')
       EPreIncr (EId variableId) ->
         do
@@ -89,7 +90,7 @@ evaluateExpression environment expression =
           let newValue = case value of
                 VInt integer -> VInt $ integer + 1
                 VDouble double -> VDouble $ double + 1
-          let environment'' = updateVariableValue environment' variableId (newValue)
+          let environment'' = updateVariableValue environment' variableId newValue
           return (newValue, environment'')
       EPreDecr (EId variableId) ->
         do
@@ -97,36 +98,12 @@ evaluateExpression environment expression =
           let newValue = case value of
                 VInt integer -> VInt $ integer - 1
                 VDouble double -> VDouble $ double - 1
-          let environment'' = updateVariableValue environment' variableId (newValue)
+          let environment'' = updateVariableValue environment' variableId newValue
           return (newValue, environment'')
-      ETimes expression1 expression2   ->
-        do
-          (value1, environment')  <- evaluateExpression environment expression1
-          (value2, environment'') <- evaluateExpression environment' expression2
-          case (value1,value2) of
-            (VInt integer1, VInt integer2)       -> return (VInt (integer1*integer2), environment'')
-            (VDouble double1, VDouble double2) -> return (VDouble (double1*double2), environment'')
-      EDiv expression1 expression2   ->
-        do
-          (value1, environment')  <- evaluateExpression environment expression1
-          (value2, environment'') <- evaluateExpression environment' expression2
-          case (value1,value2) of
-            (VInt integer1, VInt integer2)       -> return (VInt (div integer1 integer2), environment'')
-            (VDouble double1, VDouble double2) -> return (VDouble (double1/double2), environment'')
-      EPlus expression1 expression2   ->
-        do
-          (value1, environment')  <- evaluateExpression environment expression1
-          (value2, environment'') <- evaluateExpression environment' expression2
-          case (value1,value2) of
-            (VInt integer1, VInt integer2)       -> return (VInt (integer1+integer2), environment'')
-            (VDouble double1, VDouble double2) -> return (VDouble (double1+double2), environment'')
-      EMinus expression1 expression2   ->
-        do
-          (value1, environment')  <- evaluateExpression environment expression1
-          (value2, environment'') <- evaluateExpression environment' expression2
-          case (value1,value2) of
-            (VInt integer1, VInt integer2)       -> return (VInt (integer1-integer2), environment'')
-            (VDouble double1, VDouble double2) -> return (VDouble (double1-double2), environment'')
+      ETimes expression1 expression2    -> evaluteBinaryNumberExpression environment expression1 expression2 (*) (*)
+      EDiv expression1 expression2      -> evaluteBinaryNumberExpression environment expression1 expression2 div (/)
+      EPlus expression1 expression2     -> evaluteBinaryNumberExpression environment expression1 expression2 (+) (+)
+      EMinus expression1 expression2    -> evaluteBinaryNumberExpression environment expression1 expression2 (-) (-)
       ELt expression1 expression2       -> evaluateComparisonExpression (<)  expression1 expression2
       EGt expression1 expression2       -> evaluateComparisonExpression (>)  expression1 expression2
       ELtEq expression1 expression2     -> evaluateComparisonExpression (<=) expression1 expression2
@@ -164,10 +141,17 @@ evaluateExpression environment expression =
           return (VBool True, environment'')
         else
           return (VBool False, environment'')
+    evaluteBinaryNumberExpression environment expression1 expression2 integerOperator doubleOperator =
+      do
+        (value1, environment')  <- evaluateExpression environment expression1
+        (value2, environment'') <- evaluateExpression environment' expression2
+        case (value1,value2) of
+          (VInt integer1, VInt integer2)     -> return (VInt (integer1 `integerOperator` integer2), environment'')
+          (VDouble double1, VDouble double2) -> return (VDouble (double1 `doubleOperator` double2), environment'')
 
 
 executeFunction :: Environment -> Def -> IO (Value, Environment)
-executeFunction environment (DFun _ _ _ ([])) = return (VVoid, environment)
+executeFunction environment (DFun _ _ _ []) = return (VVoid, environment)
 executeFunction environment (DFun returnType functionId argumentDeclarations (statement:restStatements)) =
   do
     (returnValue, environment') <- executeStatement environment statement
@@ -176,18 +160,18 @@ executeFunction environment (DFun returnType functionId argumentDeclarations (st
       Just resultValue -> return (resultValue, environment')
 
 executeStatement :: Environment -> Stm -> IO (Maybe Value, Environment)
-executeStatement environment statement = do
+executeStatement environment statement =
   case statement of
     SExp expression ->
       do
         (_, environment') <- evaluateExpression environment expression
         return (Nothing, environment')
-    SDecls _ variableIds -> return $ (Nothing, foldl (addVariableToCurrentContext) environment variableIds)
+    SDecls _ variableIds -> return (Nothing, foldl addVariableToCurrentContext environment variableIds)
     SInit _ variableId expression ->
       do
         let environment' = addVariableToCurrentContext environment variableId
         (value, environment'') <- evaluateExpression environment' expression
-        return $ (Nothing, updateVariableValue environment'' variableId value)
+        return (Nothing, updateVariableValue environment'' variableId value)
     SReturn returnExpression ->
       do
         (resultValue, environment') <- evaluateExpression environment returnExpression
@@ -198,7 +182,7 @@ executeStatement environment statement = do
         if value == VBool True then
           do
             (returnValue, environment'') <- executeStatement environment' statement'
-            if returnValue == Nothing then
+            if isNothing returnValue then
               executeStatement environment'' statement
             else
               return (returnValue, environment'')
@@ -221,43 +205,43 @@ executeStatements environment [] = return (Nothing, environment)
 executeStatements environment (statement:statements) =
   do
     (returnValue, environment') <- executeStatement environment statement
-    if returnValue == Nothing then
+    if isNothing returnValue then
       executeStatements environment' statements
     else
       return (returnValue, environment')
 
 addVariableToCurrentContext :: Environment -> Id -> Environment
-addVariableToCurrentContext (functionDefinitions, (context:restContexts)) variableId = (functionDefinitions, (Map.insert variableId VUndef context:restContexts))
+addVariableToCurrentContext (functionDefinitions, context:restContexts) variableId = (functionDefinitions, Map.insert variableId VUndef context:restContexts)
 
 lookupVariableValue :: Environment -> Id -> Value
 lookupVariableValue (_, []) variableId = error $ "Variable " ++ printTree variableId ++ " not found."
-lookupVariableValue (functionDefinitions, (context:restContexts)) variableId =
-  case Map.lookup variableId context of
-    Nothing    -> lookupVariableValue (functionDefinitions, restContexts) variableId
-    Just value -> value
+lookupVariableValue (functionDefinitions, context:restContexts) variableId =
+  fromMaybe
+    (lookupVariableValue (functionDefinitions, restContexts) variableId)
+    (Map.lookup variableId context)
 
 updateVariableValue :: Environment -> Id -> Value -> Environment
 updateVariableValue (_, []) variableId _ = error $ "Unknown variable " ++ printTree variableId ++ "."
-updateVariableValue (functionDefinitions, (context:contexts)) variableId newValue =
+updateVariableValue (functionDefinitions, context:contexts) variableId newValue =
   case Map.lookup variableId context of
     Nothing -> let (functionDefinitions', contexts') = updateVariableValue (functionDefinitions, contexts) variableId newValue
-               in (functionDefinitions', (context:contexts'))
-    Just _  -> (functionDefinitions, (Map.insert variableId newValue context:contexts))
+               in (functionDefinitions', context:contexts')
+    Just _  -> (functionDefinitions, Map.insert variableId newValue context:contexts)
 
 lookupFunctionDefinition :: Environment -> Id -> Def
 lookupFunctionDefinition (functionDefinitions, _) functionId =
-  case Map.lookup functionId functionDefinitions of
-    Nothing -> error $ "Function " ++ show functionId ++ " not found."
-    Just functionDefinition -> functionDefinition
+  fromMaybe
+    (error $ "Function " ++ show functionId ++ " not found.")
+    (Map.lookup functionId functionDefinitions)
 
 updateFunctionDefinition :: Environment -> Def -> Environment
 updateFunctionDefinition (functionDefinitions, contexts) functionDefinition@(DFun _ functionId _ _) = (Map.insert functionId functionDefinition functionDefinitions, contexts)
 
 enterScope :: Environment -> Environment
-enterScope (functionDefinitions, contexts) = (functionDefinitions, (Map.empty:contexts))
+enterScope (functionDefinitions, contexts) = (functionDefinitions, Map.empty:contexts)
 
 leaveScope :: Environment -> Environment
-leaveScope (functionDefinitions, (_:restContexts)) = (functionDefinitions, restContexts)
+leaveScope (functionDefinitions, _:restContexts) = (functionDefinitions, restContexts)
 
 emptyEnvironment :: Environment
 emptyEnvironment = (Map.empty, []) -- (Map.empty, [Map.empty]) ?
