@@ -19,7 +19,8 @@ data Value = VInt Integer
            | VUndef
            deriving (Eq, Show)
 
-instance Ord Value where
+instance Ord Value
+  where
     compare (VInt integer1) (VInt integer2) = compare integer1 integer2
     compare (VInt integer) (VDouble double) = compare (fromIntegral integer) double
     compare (VDouble double) (VInt integer) = compare double (fromIntegral integer)
@@ -65,7 +66,9 @@ evaluateExpression environment expression =
           let argumentIds = map (\(ADecl _ it) -> it) argumentDeclarations
           let environment'' = enterScope environment'
           let arguments = zip argumentIds argumentValues
-          let environment''' = foldl (\expression' (argumentId,argumentValue) -> updateVariableValue (addVariableToCurrentContext expression' argumentId) argumentId argumentValue) environment'' arguments
+          let environment''' = foldl (\expression' (argumentId,argumentValue) ->
+                                       updateVariableValue (addVariableToCurrentContext expression' argumentId) argumentId argumentValue)
+                                       environment'' arguments
           (resultingValue, resultingEnvironment) <- executeFunction environment''' functionDefinition
           return (resultingValue, leaveScope resultingEnvironment)
       EPostIncr (EId variableId)        -> evaluateUnaryPostExpression environment variableId (+) (+)
@@ -200,7 +203,8 @@ executeStatements environment (statement:statements) =
       return (returnValue, environment')
 
 addVariableToCurrentContext :: Environment -> Id -> Environment
-addVariableToCurrentContext (functionDefinitions, context:restContexts) variableId = (functionDefinitions, Map.insert variableId VUndef context:restContexts)
+addVariableToCurrentContext (functionDefinitions, context:restContexts) variableId =
+  (functionDefinitions, Map.insert variableId VUndef context:restContexts)
 
 lookupVariableValue :: Environment -> Id -> Value
 lookupVariableValue (_, []) variableId = error $ "Variable " ++ printTree variableId ++ " not found."
@@ -224,7 +228,8 @@ lookupFunctionDefinition (functionDefinitions, _) functionId =
     (Map.lookup functionId functionDefinitions)
 
 updateFunctionDefinition :: Environment -> Def -> Environment
-updateFunctionDefinition (functionDefinitions, contexts) functionDefinition@(DFun _ functionId _ _) = (Map.insert functionId functionDefinition functionDefinitions, contexts)
+updateFunctionDefinition (functionDefinitions, contexts) functionDefinition@(DFun _ functionId _ _) =
+  (Map.insert functionId functionDefinition functionDefinitions, contexts)
 
 enterScope :: Environment -> Environment
 enterScope (functionDefinitions, contexts) = (functionDefinitions, Map.empty:contexts)
@@ -233,4 +238,4 @@ leaveScope :: Environment -> Environment
 leaveScope (functionDefinitions, _:restContexts) = (functionDefinitions, restContexts)
 
 emptyEnvironment :: Environment
-emptyEnvironment = (Map.empty, []) -- (Map.empty, [Map.empty]) ?
+emptyEnvironment = (Map.empty, [])
