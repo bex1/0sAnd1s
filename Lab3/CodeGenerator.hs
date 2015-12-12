@@ -148,7 +148,7 @@ compileStatement state =
         mapM_ compileStatement statements
         exitScope
     SIfElse conditionExpression statement1 statement2 ->
-      ifElse conditionExpression (compileStatement statement1) (compileStatement statement2)
+      compileIfElse conditionExpression (compileStatement statement1) (compileStatement statement2)
 
 compileExpression :: Exp -> State Environment ()
 compileExpression (EType expressionType expression) =
@@ -203,7 +203,7 @@ compileExpression (EType expressionType expression) =
               emit $ "dconst_1"
               emit $ "dadd"
               emit $ "dstore " ++ show variableAddress
-    EPostDecr expression'@(EType variableType (EId variableId))    ->
+    EPostDecr expression'@(EType variableType (EId variableId)) ->
       do
         compileExpression expression'
         variableAddress <- lookupVariableAddress variableId
@@ -231,7 +231,7 @@ compileExpression (EType expressionType expression) =
               emit $ "iadd"
               emit $ "dup"
               emit $ "istore " ++ show variableAddress
-    EPreDecr  expression     -> error "Not defined: EPreDecr" -- TODO
+    EPreDecr expression -> error "Not defined: EPreDecr" -- TODO
     ETimes expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "mul" expressionType
     EDiv   expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "div" expressionType
     EPlus  expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "add" expressionType
@@ -243,9 +243,9 @@ compileExpression (EType expressionType expression) =
     EEq    expression1 expression2 -> compileComparisonExpressions expression1 expression2 CEQ
     ENEq   expression1 expression2 -> compileComparisonExpressions expression1 expression2 CNEQ
     EAnd   expression1 expression2 ->
-      ifElse expression1 (ifElse expression2 (emit $ "iconst_1") (emit $ "iconst_0")) (emit $ "iconst_0")
+      compileIfElse expression1 (compileIfElse expression2 (emit $ "iconst_1") (emit $ "iconst_0")) (emit $ "iconst_0")
     EOr expression1 expression2  ->
-      ifElse expression1 (emit $ "iconst_1") (ifElse expression2 (emit $ "iconst_1") (emit $ "iconst_0"))
+      compileIfElse expression1 (emit $ "iconst_1") (compileIfElse expression2 (emit $ "iconst_1") (emit $ "iconst_0"))
     EAss (EType _ (EId variableId)) expression2  ->
       do
         compileExpression expression2
@@ -284,7 +284,7 @@ compileComparisonExpressions expression1 expression2 comparisonOperator =
   where
     compileComparison trueLabel expressionType =
       case expressionType of
-        Type_int -> emit $ "if_icmp" ++ comparisonInstruction comparisonOperator ++ trueLabel
+        Type_int    -> emit $ "if_icmp" ++ comparisonInstruction comparisonOperator ++ trueLabel
         Type_double -> emit "dcmpl" >> emit ("if" ++ comparisonInstruction comparisonOperator ++ trueLabel)
     operatorMap = zip [CLT ..] ["lt ", "le ", "eq ", "ne ", "ge ", "gt "]
     comparisonInstruction comparisonOperator = fromJust $ lookup comparisonOperator operatorMap
@@ -297,8 +297,8 @@ compileBinaryArithmeticExpression expression1 expression2 instruction expression
     Type_int    -> "i" ++ instruction
     Type_double -> "d" ++ instruction
 
-ifElse :: Exp -> State Environment () -> State Environment () -> State Environment ()
-ifElse conditionExpression compileStatement1 compileStatement2 = do
+compileIfElse :: Exp -> State Environment () -> State Environment () -> State Environment ()
+compileIfElse conditionExpression compileStatement1 compileStatement2 = do
   false <- newLabel
   true <- newLabel
   let falseLabel = "l" ++ show false
@@ -353,7 +353,7 @@ lookupFunctionReturnType functionId =
   do
     state <- get
     case Map.lookup functionId (functions state) of
-      Nothing -> error $ "No function with id " ++ show functionId
+      Nothing         -> error $ "No function with id " ++ show functionId
       Just returnType -> return returnType
 
 newScope :: State Environment ()
