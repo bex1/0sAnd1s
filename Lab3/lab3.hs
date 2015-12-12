@@ -1,6 +1,7 @@
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.Process
+import System.FilePath
 
 import AbsCPP
 import LexCPP
@@ -13,8 +14,10 @@ import CodeGenerator
 
 -- driver
 
-check :: String -> IO ()
-check s = do
+check :: FilePath -> IO ()
+check filePath = do
+  let (dir, file) = splitFileName filePath
+  s <- readFile filePath
   case pProgram (myLexer s) of
     Bad err  -> do
       putStrLn "SYNTAX ERROR"
@@ -28,23 +31,23 @@ check s = do
           exitFailure
         Ok t -> do
           putStrLn $ printTree t
-          createFile $ compile "test" t
-        --Ok t -> putStrLn $ show t
+          let strippedFileName = dropExtension file
+          createFile dir strippedFileName $ compile strippedFileName t
 
-createFile :: String -> IO ()
-createFile code = do
-  writeFile "lab3.j" code
-  system "jasmin.jar lab3.j"
-  system "java -cp . test"
-  --system "jasmin lab3.j > /dev/null"
-  --system "java -cp . test"
+createFile :: FilePath -> FilePath -> String -> IO ()
+createFile dir strippedFileName code = do
+  writeFile (combine dir (addExtension strippedFileName "j")) code
+  p <- runCommand ("java -jar jasmin.jar -d " ++ dir ++ " " ++ (dir ++ (addExtension strippedFileName "j")) ++ " > /dev/null")
+  waitForProcess p
+  runCommand ("java -cp " ++ dir ++ " " ++ strippedFileName)
   return ()
 
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [file] -> readFile file >>= check
-    _      -> do
+    [filePath] -> check filePath
+    _      ->
+      do
       putStrLn "Usage: lab3 <SourceFile>"
       exitFailure

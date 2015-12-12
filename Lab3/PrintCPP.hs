@@ -48,15 +48,15 @@ replicateS n f = concatS (replicate n f)
 -- the printer class does the job
 class Print a where
   prt :: Int -> a -> Doc
-  prtList :: Int -> [a] -> Doc
-  prtList i = concatD . map (prt i)
+  prtList :: [a] -> Doc
+  prtList = concatD . map (prt 0)
 
 instance Print a => Print [a] where
-  prt = prtList
+  prt _ = prtList
 
 instance Print Char where
   prt _ s = doc (showChar '\'' . mkEsc '\'' s . showChar '\'')
-  prtList _ s = doc (showChar '"' . concatS (map (mkEsc '"') s) . showChar '"')
+  prtList s = doc (showChar '"' . concatS (map (mkEsc '"') s) . showChar '"')
 
 mkEsc :: Char -> Char -> ShowS
 mkEsc q s = case s of
@@ -81,70 +81,86 @@ instance Print Double where
 
 instance Print Id where
   prt _ (Id i) = doc (showString ( i))
-  prtList _ [x] = (concatD [prt 0 x])
-  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ","), prt 0 xs])
+  prtList es = case es of
+   [x] -> (concatD [prt 0 x])
+   x:xs -> (concatD [prt 0 x , doc (showString ",") , prt 0 xs])
+
 
 
 instance Print Program where
   prt i e = case e of
-    PDefs defs -> prPrec i 0 (concatD [prt 0 defs])
+   PDefs defs -> prPrec i 0 (concatD [prt 0 defs])
+
 
 instance Print Def where
   prt i e = case e of
-    DFun type_ id args stms -> prPrec i 0 (concatD [prt 0 type_, prt 0 id, doc (showString "("), prt 0 args, doc (showString ")"), doc (showString "{"), prt 0 stms, doc (showString "}")])
-  prtList _ [] = (concatD [])
-  prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
+   DFun type' id args stms -> prPrec i 0 (concatD [prt 0 type' , prt 0 id , doc (showString "(") , prt 0 args , doc (showString ")") , doc (showString "{") , prt 0 stms , doc (showString "}")])
+
+  prtList es = case es of
+   [] -> (concatD [])
+   x:xs -> (concatD [prt 0 x , prt 0 xs])
+
 instance Print Arg where
   prt i e = case e of
-    ADecl type_ id -> prPrec i 0 (concatD [prt 0 type_, prt 0 id])
-  prtList _ [] = (concatD [])
-  prtList _ [x] = (concatD [prt 0 x])
-  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ","), prt 0 xs])
+   ADecl type' id -> prPrec i 0 (concatD [prt 0 type' , prt 0 id])
+
+  prtList es = case es of
+   [] -> (concatD [])
+   [x] -> (concatD [prt 0 x])
+   x:xs -> (concatD [prt 0 x , doc (showString ",") , prt 0 xs])
+
 instance Print Stm where
   prt i e = case e of
-    SExp exp -> prPrec i 0 (concatD [prt 0 exp, doc (showString ";")])
-    SDecls type_ ids -> prPrec i 0 (concatD [prt 0 type_, prt 0 ids, doc (showString ";")])
-    SInit type_ id exp -> prPrec i 0 (concatD [prt 0 type_, prt 0 id, doc (showString "="), prt 0 exp, doc (showString ";")])
-    SReturn exp -> prPrec i 0 (concatD [doc (showString "return"), prt 0 exp, doc (showString ";")])
-    SWhile exp stm -> prPrec i 0 (concatD [doc (showString "while"), doc (showString "("), prt 0 exp, doc (showString ")"), prt 0 stm])
-    SBlock stms -> prPrec i 0 (concatD [doc (showString "{"), prt 0 stms, doc (showString "}")])
-    SIfElse exp stm1 stm2 -> prPrec i 0 (concatD [doc (showString "if"), doc (showString "("), prt 0 exp, doc (showString ")"), prt 0 stm1, doc (showString "else"), prt 0 stm2])
-  prtList _ [] = (concatD [])
-  prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
+   SExp exp -> prPrec i 0 (concatD [prt 0 exp , doc (showString ";")])
+   SDecls type' ids -> prPrec i 0 (concatD [prt 0 type' , prt 0 ids , doc (showString ";")])
+   SInit type' id exp -> prPrec i 0 (concatD [prt 0 type' , prt 0 id , doc (showString "=") , prt 0 exp , doc (showString ";")])
+   SReturn exp -> prPrec i 0 (concatD [doc (showString "return") , prt 0 exp , doc (showString ";")])
+   SWhile exp stm -> prPrec i 0 (concatD [doc (showString "while") , doc (showString "(") , prt 0 exp , doc (showString ")") , prt 0 stm])
+   SBlock stms -> prPrec i 0 (concatD [doc (showString "{") , prt 0 stms , doc (showString "}")])
+   SIfElse exp stm0 stm -> prPrec i 0 (concatD [doc (showString "if") , doc (showString "(") , prt 0 exp , doc (showString ")") , prt 0 stm0 , doc (showString "else") , prt 0 stm])
+
+  prtList es = case es of
+   [] -> (concatD [])
+   x:xs -> (concatD [prt 0 x , prt 0 xs])
+
 instance Print Exp where
   prt i e = case e of
-    ETrue -> prPrec i 15 (concatD [doc (showString "true")])
-    EFalse -> prPrec i 15 (concatD [doc (showString "false")])
-    EInt n -> prPrec i 15 (concatD [prt 0 n])
-    EDouble d -> prPrec i 15 (concatD [prt 0 d])
-    EId id -> prPrec i 15 (concatD [prt 0 id])
-    EApp id exps -> prPrec i 15 (concatD [prt 0 id, doc (showString "("), prt 0 exps, doc (showString ")")])
-    EPostIncr exp -> prPrec i 14 (concatD [prt 15 exp, doc (showString "++")])
-    EPostDecr exp -> prPrec i 14 (concatD [prt 15 exp, doc (showString "--")])
-    EPreIncr exp -> prPrec i 13 (concatD [doc (showString "++"), prt 14 exp])
-    EPreDecr exp -> prPrec i 13 (concatD [doc (showString "--"), prt 14 exp])
-    ETimes exp1 exp2 -> prPrec i 12 (concatD [prt 12 exp1, doc (showString "*"), prt 13 exp2])
-    EDiv exp1 exp2 -> prPrec i 12 (concatD [prt 12 exp1, doc (showString "/"), prt 13 exp2])
-    EPlus exp1 exp2 -> prPrec i 11 (concatD [prt 11 exp1, doc (showString "+"), prt 12 exp2])
-    EMinus exp1 exp2 -> prPrec i 11 (concatD [prt 11 exp1, doc (showString "-"), prt 12 exp2])
-    ELt exp1 exp2 -> prPrec i 9 (concatD [prt 10 exp1, doc (showString "<"), prt 10 exp2])
-    EGt exp1 exp2 -> prPrec i 9 (concatD [prt 10 exp1, doc (showString ">"), prt 10 exp2])
-    ELtEq exp1 exp2 -> prPrec i 9 (concatD [prt 10 exp1, doc (showString "<="), prt 10 exp2])
-    EGtEq exp1 exp2 -> prPrec i 9 (concatD [prt 10 exp1, doc (showString ">="), prt 10 exp2])
-    EEq exp1 exp2 -> prPrec i 8 (concatD [prt 9 exp1, doc (showString "=="), prt 9 exp2])
-    ENEq exp1 exp2 -> prPrec i 8 (concatD [prt 9 exp1, doc (showString "!="), prt 9 exp2])
-    EAnd exp1 exp2 -> prPrec i 4 (concatD [prt 4 exp1, doc (showString "&&"), prt 5 exp2])
-    EOr exp1 exp2 -> prPrec i 3 (concatD [prt 3 exp1, doc (showString "||"), prt 4 exp2])
-    EAss exp1 exp2 -> prPrec i 2 (concatD [prt 3 exp1, doc (showString "="), prt 2 exp2])
-    EType type_ exp -> prPrec i 0 (concatD [doc (showString "("), prt 0 type_, doc (showString ")"), prt 0 exp])
-  prtList _ [] = (concatD [])
-  prtList _ [x] = (concatD [prt 0 x])
-  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ","), prt 0 xs])
+   ETrue  -> prPrec i 15 (concatD [doc (showString "true")])
+   EFalse  -> prPrec i 15 (concatD [doc (showString "false")])
+   EInt n -> prPrec i 15 (concatD [prt 0 n])
+   EDouble d -> prPrec i 15 (concatD [prt 0 d])
+   EId id -> prPrec i 15 (concatD [prt 0 id])
+   EApp id exps -> prPrec i 15 (concatD [prt 0 id , doc (showString "(") , prt 0 exps , doc (showString ")")])
+   EPostIncr exp -> prPrec i 14 (concatD [prt 15 exp , doc (showString "++")])
+   EPostDecr exp -> prPrec i 14 (concatD [prt 15 exp , doc (showString "--")])
+   EPreIncr exp -> prPrec i 13 (concatD [doc (showString "++") , prt 14 exp])
+   EPreDecr exp -> prPrec i 13 (concatD [doc (showString "--") , prt 14 exp])
+   ETimes exp0 exp -> prPrec i 12 (concatD [prt 12 exp0 , doc (showString "*") , prt 13 exp])
+   EDiv exp0 exp -> prPrec i 12 (concatD [prt 12 exp0 , doc (showString "/") , prt 13 exp])
+   EPlus exp0 exp -> prPrec i 11 (concatD [prt 11 exp0 , doc (showString "+") , prt 12 exp])
+   EMinus exp0 exp -> prPrec i 11 (concatD [prt 11 exp0 , doc (showString "-") , prt 12 exp])
+   ELt exp0 exp -> prPrec i 9 (concatD [prt 10 exp0 , doc (showString "<") , prt 10 exp])
+   EGt exp0 exp -> prPrec i 9 (concatD [prt 10 exp0 , doc (showString ">") , prt 10 exp])
+   ELtEq exp0 exp -> prPrec i 9 (concatD [prt 10 exp0 , doc (showString "<=") , prt 10 exp])
+   EGtEq exp0 exp -> prPrec i 9 (concatD [prt 10 exp0 , doc (showString ">=") , prt 10 exp])
+   EEq exp0 exp -> prPrec i 8 (concatD [prt 9 exp0 , doc (showString "==") , prt 9 exp])
+   ENEq exp0 exp -> prPrec i 8 (concatD [prt 9 exp0 , doc (showString "!=") , prt 9 exp])
+   EAnd exp0 exp -> prPrec i 4 (concatD [prt 4 exp0 , doc (showString "&&") , prt 5 exp])
+   EOr exp0 exp -> prPrec i 3 (concatD [prt 3 exp0 , doc (showString "||") , prt 4 exp])
+   EAss exp0 exp -> prPrec i 2 (concatD [prt 3 exp0 , doc (showString "=") , prt 2 exp])
+   EType type' exp -> prPrec i 0 (concatD [doc (showString "(") , prt 0 type' , doc (showString ")") , prt 0 exp])
+
+  prtList es = case es of
+   [] -> (concatD [])
+   [x] -> (concatD [prt 0 x])
+   x:xs -> (concatD [prt 0 x , doc (showString ",") , prt 0 xs])
+
 instance Print Type where
   prt i e = case e of
-    Type_bool -> prPrec i 0 (concatD [doc (showString "bool")])
-    Type_int -> prPrec i 0 (concatD [doc (showString "int")])
-    Type_double -> prPrec i 0 (concatD [doc (showString "double")])
-    Type_void -> prPrec i 0 (concatD [doc (showString "void")])
+   Type_bool  -> prPrec i 0 (concatD [doc (showString "bool")])
+   Type_int  -> prPrec i 0 (concatD [doc (showString "int")])
+   Type_double  -> prPrec i 0 (concatD [doc (showString "double")])
+   Type_void  -> prPrec i 0 (concatD [doc (showString "void")])
+
 
 
