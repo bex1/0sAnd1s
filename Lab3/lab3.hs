@@ -14,40 +14,46 @@ import CodeGenerator
 
 -- driver
 
-check :: FilePath -> IO ()
-check filePath = do
-  let (dir, file) = splitFileName filePath
-  s <- readFile filePath
-  case pProgram (myLexer s) of
-    Bad err  -> do
-      putStrLn "SYNTAX ERROR"
-      putStrLn err
-      exitFailure
-    Ok  tree -> do
-      case typecheck tree of
-        Bad err -> do
-          putStrLn "TYPE ERROR"
+compileAndRunAsJava :: FilePath -> IO ()
+compileAndRunAsJava filePath =
+  do
+    let (dir, file) = splitFileName filePath
+    s <- readFile filePath
+    case pProgram (myLexer s) of
+      Bad err  ->
+        do
+          putStrLn "SYNTAX ERROR"
           putStrLn err
           exitFailure
-        Ok t -> do
-          putStrLn $ printTree t
-          let strippedFileName = dropExtension file
-          createFile dir strippedFileName $ compile strippedFileName t
+      Ok  tree ->
+        case typecheck tree of
+          Bad err ->
+            do
+              putStrLn "TYPE ERROR"
+              putStrLn err
+              exitFailure
+          Ok t ->
+            do
+              putStrLn $ printTree t
+              let strippedFileName = dropExtension file
+              runCompiler dir strippedFileName $ compile strippedFileName t
 
-createFile :: FilePath -> FilePath -> String -> IO ()
-createFile dir strippedFileName code = do
-  writeFile (combine dir (addExtension strippedFileName "j")) code
-  p <- runCommand ("java -jar jasmin.jar -d " ++ dir ++ " " ++ (dir ++ (addExtension strippedFileName "j")) ++ " > /dev/null")
-  waitForProcess p
-  runCommand ("java -cp " ++ dir ++ " " ++ strippedFileName)
-  return ()
+runCompiler :: FilePath -> FilePath -> String -> IO ()
+runCompiler dir strippedFileName code =
+  do
+    writeFile (combine dir (addExtension strippedFileName "j")) code
+    p <- runCommand ("java -jar jasmin.jar -d " ++ dir ++ " " ++ (dir ++ addExtension strippedFileName "j") ++ " > /dev/null")
+    waitForProcess p
+    runCommand ("java -cp " ++ dir ++ " " ++ strippedFileName)
+    return ()
 
 main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    [filePath] -> check filePath
-    _      ->
-      do
-      putStrLn "Usage: lab3 <SourceFile>"
-      exitFailure
+main =
+  do
+    args <- getArgs
+    case args of
+      [filePath] -> compileAndRunAsJava filePath
+      _      ->
+        do
+          putStrLn "Usage: lab3 <SourceFile>"
+          exitFailure

@@ -21,7 +21,8 @@ data Environment = Environment {
 } deriving (Show)
 
 compile :: String -> Program -> String
-compile state program = unlines $ reverse $ code (execState (compileProgram state program) (emptyClassEnvironment state))
+compile state program =
+  unlines $ reverse $ code (execState (compileProgram state program) (emptyClassEnvironment state))
 
 compileProgram :: String -> Program -> State Environment ()
 compileProgram name (PDefs definitions) =
@@ -30,67 +31,62 @@ compileProgram name (PDefs definitions) =
     mapM_ emit [
       ".class public " ++ name,
       ".super java/lang/Object",
-      "",
       ".method public <init>()V",
-      "",
       "aload_0",
       "invokespecial java/lang/Object/<init>()V",
       "return",
-      "",
       ".end method",
-      "",
       ".method public static main([Ljava/lang/String;)V",
       ".limit locals 100",
       ".limit stack 1000",
-      "",
       "invokestatic " ++ name ++ "/main()I",
       "pop",
       "return",
-      "",
       ".end method"
      ]
     mapM_ compileDefintion definitions
 
 buildSymbolTable :: [Def] -> State Environment ()
-buildSymbolTable definitions = mapM_ (\(DFun functionType functionId _ _) -> addFunction functionId functionType) definitions
+buildSymbolTable = mapM_ (\(DFun functionType functionId _ _) -> addFunction functionId functionType)
 
 compileDefintion :: Def -> State Environment ()
 compileDefintion (DFun returnType (Id "main") _ statements) =
   do
-    emit $ ""
-    emit $ ".method public static main()I"
-    emit $ ".limit locals 100"
-    emit $ ".limit stack 1000"
+    emit ".method public static main()I"
+    emit ".limit locals 100"
+    emit ".limit stack 1000"
     newScope
-    mapM_ compileStatement $ statements
+    mapM_ compileStatement statements
     exitScope
     -- default return
-    emit $ "iconst_0"
-    emit $ "ireturn"
+    emit "iconst_0"
+    emit "ireturn"
     emit ".end method"
 compileDefintion (DFun returnType (Id functionId) arguments statements) =
   do
     emit $ ".method public static " ++ functionId ++ "(" ++ argumentTypes ++ ")" ++ typeIndicator returnType
-    emit $ ".limit locals 100"
-    emit $ ".limit stack 1000"
+    emit ".limit locals 100"
+    emit ".limit stack 1000"
     newScope
     state <- get
     let tempAddress = nextAddress state
     modify (\state -> state {nextAddress = 0} )
     mapM_ (\(ADecl variableType variableId) -> addVariable variableId variableType) arguments
-    mapM_ (\(ADecl variableType variableId) -> lookupVariableAddress variableId >>= (\variableAddress -> emit $ loadInstruction variableType ++ " " ++ show variableAddress)) arguments
-    mapM_ compileStatement $ statements
+    mapM_ (\(ADecl variableType variableId) ->
+          lookupVariableAddress variableId >>=
+          (\variableAddress -> emit $ loadInstruction variableType ++ " " ++ show variableAddress)) arguments
+    mapM_ compileStatement statements
     modify (\state' -> state' { nextAddress = tempAddress } )
     -- default return
     case returnType of
       Type_int    -> emit "iconst_0" >> emit "ireturn"
       Type_bool   -> emit "iconst_0" >> emit "ireturn"
       Type_double -> emit "dconst_0" >> emit "dreturn"
-      Type_void   -> emit $ "return"
+      Type_void   -> emit "return"
     emit ".end method"
     exitScope
   where
-    argumentTypes = concat $ map (\(ADecl argumentType _) -> typeIndicator argumentType) arguments
+    argumentTypes = concatMap (\(ADecl argumentType _) -> typeIndicator argumentType) arguments
     loadInstruction Type_int = "iload"
     loadInstruction Type_double = "dload"
     loadInstruction Type_bool   = "iload"
@@ -108,11 +104,17 @@ compileStatement state =
           Type_void -> return ()
     SDecls variableType variableIds ->
       do
-        mapM_ (\variableId -> addVariable variableId variableType) variableIds
+        mapM_ (`addVariable` variableType) variableIds
         case variableType of
-          Type_int -> mapM_ (\variableId -> lookupVariableAddress variableId >>= (\variableAddress -> emit "iconst_0" >> emit ("istore " ++ show variableAddress))) variableIds
-          Type_double -> mapM_ (\variableId -> lookupVariableAddress variableId >>= (\variableAddress -> emit "dconst_0" >> emit ("dstore " ++ show variableAddress))) variableIds
-          Type_bool -> mapM_ (\variableId -> lookupVariableAddress variableId >>= (\variableAddress -> emit "iconst_0" >> emit ("istore " ++ show variableAddress))) variableIds
+          Type_int ->
+            mapM_ (\variableId -> lookupVariableAddress variableId >>=
+                  (\variableAddress -> emit "iconst_0" >> emit ("istore " ++ show variableAddress))) variableIds
+          Type_double ->
+            mapM_ (\variableId -> lookupVariableAddress variableId >>=
+                  (\variableAddress -> emit "dconst_0" >> emit ("dstore " ++ show variableAddress))) variableIds
+          Type_bool ->
+            mapM_ (\variableId -> lookupVariableAddress variableId >>=
+                  (\variableAddress -> emit "iconst_0" >> emit ("istore " ++ show variableAddress))) variableIds
     SInit variableType variableId expression ->
       do
         addVariable variableId variableType
@@ -134,8 +136,8 @@ compileStatement state =
       do
         test <- newLabel
         end  <- newLabel
-        let testLabel = "l" ++ show test
-        let endLabel = "l" ++ show end
+        let testLabel = 'l' : show test
+        let endLabel = 'l' : show end
         emit $ testLabel ++ ":"
         compileExpression conditionExpression
         emit $ "ifeq " ++ endLabel
@@ -167,85 +169,39 @@ compileExpression (EType expressionType expression) =
     EApp (Id "printInt") expression' ->
       do
         mapM_ compileExpression expression'
-        emit $ "invokestatic Runtime/printInt(I)V"
+        emit "invokestatic Runtime/printInt(I)V"
     EApp (Id "printDouble") expression' ->
       do
         mapM_ compileExpression expression'
-        emit $ "invokestatic Runtime/printDouble(D)V"
-    EApp (Id "readInt")    _ ->
-      do
-        emit $ "invokestatic Runtime/readInt()I"
-    EApp (Id "readDouble") _ ->
-      do
-        emit $ "invokestatic Runtime/readDouble()D"
+        emit "invokestatic Runtime/printDouble(D)V"
+    EApp (Id "readInt")    _ -> emit "invokestatic Runtime/readInt()I"
+    EApp (Id "readDouble") _ -> emit "invokestatic Runtime/readDouble()D"
     EApp (Id functionId) expressions ->
       do
         functionType <- lookupFunctionReturnType (Id functionId)
         mapM_ compileExpression expressions
         state <- get
-        emit $ "invokestatic " ++ (className state) ++ "/" ++ functionId ++ "(" ++ argumentTypes ++ ")" ++ typeIndicator functionType
+        emit $ "invokestatic " ++ className state ++ "/" ++ functionId ++ "(" ++ argumentTypes ++ ")" ++ typeIndicator functionType
       where
-        argumentTypes = concat $ map (\(EType argumentType _) -> typeIndicator argumentType) expressions
-    EPostIncr expression'@(EType variableType (EId variableId)) ->
-      do
-        compileExpression expression'
-        variableAddress <- lookupVariableAddress variableId
-        case variableType of
-          Type_int ->
-            do
-              emit $ "dup"
-              emit $ "iconst_1"
-              emit $ "iadd"
-              emit $ "istore " ++ show variableAddress
-          Type_double ->
-            do
-              emit $ "dup2"
-              emit $ "dconst_1"
-              emit $ "dadd"
-              emit $ "dstore " ++ show variableAddress
-    EPostDecr expression'@(EType variableType (EId variableId)) ->
-      do
-        compileExpression expression'
-        variableAddress <- lookupVariableAddress variableId
-        case variableType of
-          Type_int ->
-            do
-              emit $ "dup"
-              emit $ "iconst_1"
-              emit $ "isub"
-              emit $ "istore " ++ show variableAddress
-          Type_double ->
-            do
-              emit $ "dup2"
-              emit $ "dconst_1"
-              emit $ "dsub"
-              emit $ "dstore " ++ show variableAddress
-    EPreIncr expression'@(EType variableType (EId variableId)) ->
-      do
-        compileExpression expression'
-        variableAddress <- lookupVariableAddress variableId
-        case variableType of
-          Type_int ->
-            do
-              emit $ "iconst_1"
-              emit $ "iadd"
-              emit $ "dup"
-              emit $ "istore " ++ show variableAddress
-    EPreDecr expression -> error "Not defined: EPreDecr" -- TODO
+        argumentTypes = concatMap (\ (EType argumentType _) -> typeIndicator argumentType) expressions
+    EPostIncr expression' -> compilePostExpression expression' "iadd" "dadd"
+    EPostDecr expression' -> compilePostExpression expression' "isub" "dsub"
+    EPreIncr expression' -> compilePreExpression expression' "iadd" "dadd"
+    EPreDecr expression' -> compilePreExpression expression' "isub" "dsub"
     ETimes expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "mul" expressionType
     EDiv   expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "div" expressionType
     EPlus  expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "add" expressionType
     EMinus expression1 expression2 -> compileBinaryArithmeticExpression expression1 expression2 "sub" expressionType
-    ELt    expression1 expression2 -> compileComparisonExpressions expression1 expression2 CLT
-    EGt    expression1 expression2 -> compileComparisonExpressions expression1 expression2 CGT
-    ELtEq  expression1 expression2 -> compileComparisonExpressions expression1 expression2 CLTEQ
-    EGtEq  expression1 expression2 -> compileComparisonExpressions expression1 expression2 CGTEQ
-    EEq    expression1 expression2 -> compileComparisonExpressions expression1 expression2 CEQ
-    ENEq   expression1 expression2 -> compileComparisonExpressions expression1 expression2 CNEQ
+    ELt    expression1 expression2 -> compileComparisonExpression expression1 expression2 CLT
+    EGt    expression1 expression2 -> compileComparisonExpression expression1 expression2 CGT
+    ELtEq  expression1 expression2 -> compileComparisonExpression expression1 expression2 CLTEQ
+    EGtEq  expression1 expression2 -> compileComparisonExpression expression1 expression2 CGTEQ
+    EEq    expression1 expression2 -> compileComparisonExpression expression1 expression2 CEQ
+    ENEq   expression1 expression2 -> compileComparisonExpression expression1 expression2 CNEQ
     EAnd   expression1 expression2 ->
-      compileIfElse expression1 (compileIfElse expression2 (emit $ "iconst_1") (emit $ "iconst_0")) (emit $ "iconst_0")
+      compileIfElse expression1 (compileIfElse expression2 (emit "iconst_1") (emit "iconst_0")) (emit "iconst_0")
     EOr expression1 expression2  ->
-      compileIfElse expression1 (emit $ "iconst_1") (compileIfElse expression2 (emit $ "iconst_1") (emit $ "iconst_0"))
+      compileIfElse expression1 (emit "iconst_1") (compileIfElse expression2 (emit "iconst_1") (emit "iconst_0"))
     EAss (EType _ (EId variableId)) expression2  ->
       do
         compileExpression expression2
@@ -253,27 +209,27 @@ compileExpression (EType expressionType expression) =
         case expressionType of
           Type_int ->
             do
-              emit $ "dup"
+              emit "dup"
               emit $ "istore " ++ show variableAddress
           Type_double ->
             do
-              emit $ "dup2"
+              emit "dup2"
               emit $ "dstore " ++ show variableAddress
           Type_bool ->
             do
-              emit $ "dup"
+              emit "dup"
               emit $ "istore " ++ show variableAddress
 compileExpression expression = error $ "Not type annotated with EType: " ++ show expression
 
 data ComparisonOperator = CLT | CLTEQ | CEQ | CNEQ | CGTEQ | CGT
   deriving (Enum, Eq)
 
-compileComparisonExpressions :: Exp -> Exp -> ComparisonOperator -> State Environment ()
-compileComparisonExpressions expression1 expression2 comparisonOperator =
+compileComparisonExpression :: Exp -> Exp -> ComparisonOperator -> State Environment ()
+compileComparisonExpression expression1 expression2 comparisonOperator =
   do
     let expression1Type = typeOfExpression expression1
     true <- newLabel
-    let trueLabel = "l" ++ show true
+    let trueLabel = 'l' : show true
     emit "bipush 1"
     compileExpression expression1
     compileExpression expression2
@@ -290,26 +246,66 @@ compileComparisonExpressions expression1 expression2 comparisonOperator =
     comparisonInstruction comparisonOperator = fromJust $ lookup comparisonOperator operatorMap
 
 compileBinaryArithmeticExpression :: Exp -> Exp -> Instruction -> Type -> State Environment ()
-compileBinaryArithmeticExpression expression1 expression2 instruction expressionType = do
-  compileExpression expression1
-  compileExpression expression2
-  emit $ case expressionType of
-    Type_int    -> "i" ++ instruction
-    Type_double -> "d" ++ instruction
+compileBinaryArithmeticExpression expression1 expression2 instruction expressionType =
+  do
+    compileExpression expression1
+    compileExpression expression2
+    emit $ case expressionType of
+      Type_int    -> 'i' : instruction
+      Type_double -> 'd' : instruction
+
+compilePostExpression :: Exp -> Instruction -> Instruction -> State Environment ()
+compilePostExpression expression@(EType variableType (EId variableId)) integerInstruction doubleInstruction =
+  do
+    compileExpression expression
+    variableAddress <- lookupVariableAddress variableId
+    case variableType of
+      Type_int ->
+        do
+          emit "dup"
+          emit "iconst_1"
+          emit integerInstruction
+          emit $ "istore " ++ show variableAddress
+      Type_double ->
+        do
+          emit "dup2"
+          emit "dconst_1"
+          emit doubleInstruction
+          emit $ "dstore " ++ show variableAddress
+
+compilePreExpression :: Exp -> Instruction -> Instruction -> State Environment ()
+compilePreExpression expression@(EType variableType (EId variableId)) integerInstruction doubleInstruction =
+  do
+    compileExpression expression
+    variableAddress <- lookupVariableAddress variableId
+    case variableType of
+      Type_int ->
+        do
+          emit "iconst_1"
+          emit integerInstruction
+          emit "dup"
+          emit $ "istore " ++ show variableAddress
+      Type_double ->
+        do
+          emit "dconst_1"
+          emit doubleInstruction
+          emit "dup2"
+          emit $ "dstore " ++ show variableAddress
 
 compileIfElse :: Exp -> State Environment () -> State Environment () -> State Environment ()
-compileIfElse conditionExpression compileStatement1 compileStatement2 = do
-  false <- newLabel
-  true <- newLabel
-  let falseLabel = "l" ++ show false
-  let trueLabel = "l" ++ show true
-  compileExpression conditionExpression
-  emit $ "ifeq " ++ falseLabel
-  compileStatement1
-  emit $ "goto " ++ trueLabel
-  emit $ falseLabel ++ ":"
-  compileStatement2
-  emit $ trueLabel ++ ":"
+compileIfElse conditionExpression compileStatement1 compileStatement2 =
+  do
+    false <- newLabel
+    true <- newLabel
+    let falseLabel = 'l' : show false
+    let trueLabel = 'l' : show true
+    compileExpression conditionExpression
+    emit $ "ifeq " ++ falseLabel
+    compileStatement1
+    emit $ "goto " ++ trueLabel
+    emit $ falseLabel ++ ":"
+    compileStatement2
+    emit $ trueLabel ++ ":"
 
 typeIndicator :: Type -> String
 typeIndicator (Type_int)    = "I"
@@ -341,19 +337,15 @@ lookupVariableAddress variableId =
     state <- get
     return $ findVariableAddress (variableScopes state)
   where
-    findVariableAddress [] = error $ "No variable " ++ show variableId ++ " found"
-    findVariableAddress (scope:restScopes) =
-      do
-        case Map.lookup variableId scope of
-          Just variableAddress  -> variableAddress
-          Nothing               -> findVariableAddress restScopes
+    findVariableAddress [] = error $ "No variable called " ++ show variableId ++ " could be found."
+    findVariableAddress (scope:restScopes) = fromMaybe (findVariableAddress restScopes) (Map.lookup variableId scope)
 
 lookupFunctionReturnType :: Id -> State Environment Type
 lookupFunctionReturnType functionId =
   do
     state <- get
     case Map.lookup functionId (functions state) of
-      Nothing         -> error $ "No function with id " ++ show functionId
+      Nothing         -> error $ "No function called " ++ show functionId ++ " could be found."
       Just returnType -> return returnType
 
 newScope :: State Environment ()
@@ -377,12 +369,13 @@ addVariable variableId variableType =
     let (currentScope:restScopes) = variableScopes state
     modify (\state' -> state'
       {
-        nextAddress = (nextAddress state') + typeAddressSize variableType,
+        nextAddress = nextAddress state' + typeAddressSize variableType,
         variableScopes = Map.insert variableId (nextAddress state') currentScope:restScopes
       })
 
 addFunction :: Id -> Type -> State Environment ()
-addFunction functionId functionType = modify (\state -> state { functions = Map.insert functionId functionType (functions state) } )
+addFunction functionId functionType =
+  modify (\state -> state { functions = Map.insert functionId functionType $ functions state } )
 
 typeAddressSize :: Type -> Int
 typeAddressSize Type_int    = 1

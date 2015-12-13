@@ -38,9 +38,11 @@ buildSymbolTable environment (DFun returnType functionId arguments _:restDefinit
     getType (ADecl declarationType _) = declarationType
 
 checkDefinitions :: Environment -> [Def] -> Err (Environment, [Def])
-checkDefinitions environment definitions =
-    foldM accumelateDefinitions (environment, []) definitions
-  where accumelateDefinitions (environment, annotatedDefinitions) definition = do
+checkDefinitions environment =
+    foldM accumelateDefinitions (environment, [])
+  where
+    accumelateDefinitions (environment, annotatedDefinitions) definition =
+      do
         (environment', annotatedDefinition) <- checkDefinition environment definition
         return (environment', annotatedDefinitions ++ [annotatedDefinition])
 
@@ -54,8 +56,8 @@ checkDefinition environment (DFun returnType functionId arguments statements) =
     addArgument environment (ADecl argumentType argumentId) = updateVariable environment argumentId argumentType
 
 checkStatements :: Environment -> Type -> [Stm] -> Err (Environment, [Stm])
-checkStatements environment returnType statements =
-    foldM accumelateStatements (environment, []) statements
+checkStatements environment returnType =
+    foldM accumelateStatements (environment, [])
   where accumelateStatements (environment, annotatedStatements) statement = do
         (environment', annotatedStatement) <- checkStatement environment returnType statement
         return (environment', annotatedStatements ++ [annotatedStatement])
@@ -66,7 +68,7 @@ checkStatement environment functionReturnType statement =
       SExp expression ->
         do
           annotatedExpression <- inferExpression environment expression
-          return (environment, (SExp annotatedExpression))
+          return (environment, SExp annotatedExpression)
       SDecls variableType variableIds ->
         do
           environment' <- foldM (addVariable variableType) environment variableIds
@@ -75,7 +77,7 @@ checkStatement environment functionReturnType statement =
         do
           annotatedExpression <- checkExpression environment expression variableType
           environment' <- updateVariable environment variableId variableType
-          return (environment', (SInit variableType variableId annotatedExpression))
+          return (environment', SInit variableType variableId annotatedExpression)
       SReturn returnExpression ->
         do
           annotatedExpression <- checkExpression environment returnExpression functionReturnType
@@ -88,13 +90,13 @@ checkStatement environment functionReturnType statement =
       SBlock statements ->
         do
           (_, annotatedStatements) <- checkStatements (newBlock environment) functionReturnType statements
-          return (environment, (SBlock annotatedStatements))
+          return (environment, SBlock annotatedStatements)
       SIfElse conditionExpression trueStatement falseStatement ->
         do
           annotatedExpression <- checkExpression environment conditionExpression Type_bool
           (_, annotatedStatement1) <- checkStatement environment functionReturnType trueStatement
           (_, annotatedStatement2) <- checkStatement environment functionReturnType falseStatement
-          return (environment, (SIfElse annotatedExpression annotatedStatement1 annotatedStatement2))
+          return (environment, SIfElse annotatedExpression annotatedStatement1 annotatedStatement2)
   where
     addVariable variableType environment variableId = updateVariable environment variableId variableType
 
