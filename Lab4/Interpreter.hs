@@ -1,97 +1,138 @@
 module Interpreter where
 
 import AbsGrammar
-
-import Prelude hiding (lookup)
+import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe
 
-data EvalMode = CallByName | CallByValue deriving (Eq)
+data EvaluationMode
+  = CallByName
+  | CallByValue
+  deriving (Eq)
 
-interpret :: Program -> EvalMode -> Integer
-interpret = execProgram
+data Environment
+  = Environment
+    {
+      functions :: Map Ident Value,
+      variables :: Map Ident Value
+    }
+  deriving (Show, Eq)
 
-execProgram :: Program -> EvalMode -> Integer
-execProgram (Prog defs) mode = i
-  where VClosure mainExp _ = lookup (Ident "main") env
-        env = buildFunMap defs
-        v = evalExp env mainExp mode
-        i = case v of
-                VInt i' -> i'
-                VClosure (EInt i') _ -> i'
+data Value
+  = IntegerValue Integer
+  | Closure Exp Environment
+  deriving (Show, Eq)
 
-buildFunMap :: [Def] -> Env
-buildFunMap = foldl (\env (DDef i args e) -> updateFun env i (createEmptyClosure e args)) emptyEnv
+interpret :: Program -> EvaluationMode -> Integer
+interpret (Prog definitions) evaluationMode = result
+  where
+    Closure mainExpression _ = lookupIdentifier (Ident "main") environment
+    environment = buildFunctionEnvironment definitions
+    value = evaluateExpression environment mainExpression evaluationMode
+    result = getIntegerValue value
 
-execDef :: Env -> Def -> EvalMode -> Value
-execDef env (DDef _ _ e) = evalExp env e
+buildFunctionEnvironment :: [Def] -> Environment
+buildFunctionEnvironment =
+  foldl
+    (\environment (DDef identifier args expression) ->
+      updateFunction environment identifier (createEmptyClosure expression args))
+    emptyEnvironment
 
-evalExp :: Env -> Exp -> EvalMode -> Value
-evalExp env e mode = case e of
-    EVar i -> let VClosure e' env' = lookup i env
-             in evalExp (Env (functions env) (variables env')) e' mode
-    EInt _ -> VClosure e emptyEnv -- maybe variables env?
-    EApp e1 e2 -> let VClosure (EAbs x e') env' = evalExp env e1 mode
-                      u = case mode of
-                              CallByName -> VClosure e2 (Env Map.empty $ variables env)
-                              CallByValue -> evalExp env e2 mode
-                      newEnv = updateVar (Env (functions env) (variables env')) x u
-                  in evalExp newEnv e' mode
-    EAdd e1 e2 -> let u = value $ evalExp env e1 mode
-                      v = value $ evalExp env e2 mode
-                  in VClosure (EInt (u + v)) emptyEnv
-    ESub e1 e2 -> let u = value $ evalExp env e1 mode
-                      v = value $ evalExp env e2 mode
-                  in VClosure (EInt (u - v)) emptyEnv
-    ELt e1 e2 -> let u = value $ evalExp env e1 mode
-                     v = value $ evalExp env e2 mode
-                 in VInt (if u < v then 1 else 0)
-    EIf c a b -> let u = evalExp env c mode
-                 in if u == VInt 1
-                     then evalExp env a mode
-                     else evalExp env b mode
-    EAbs _ _ -> VClosure e (Env Map.empty $ variables env)
+evaluateExpression :: Environment -> Exp -> EvaluationMode -> Value
+evaluateExpression environment expression evaluationMode =
+  case expression of
 
+    EVar identifier ->
+      let
+        Closure expression' environment' = lookupIdentifier identifier environment
+      in
+        evaluateExpression (Environment (functions environment) (variables environment')) expression' evaluationMode
 
-value :: Value -> Integer
-value (VInt i) = i
-value (VClosure (EInt i) _) = i
-value _ = error "Not possible to get integer value."
+    EInt _ -> Closure expression emptyEnvironment -- maybe variables environment?
+
+    EApp expression1 expression2 ->
+      let
+        Closure (EAbs identifier expression') environment' = evaluateExpression environment expression1 evaluationMode
+        value = case evaluationMode of
+          CallByName -> Closure expression2 (Environment Map.empty $ variables environment)
+          CallByValue -> evaluateExpression environment expression2 evaluationMode
+        newEnvironment = updateVariable (Environment (functions environment) (variables environment')) identifier value
+      in
+        evaluateExpression newEnvironment expression' evaluationMode
+
+    EAdd expression1 expression2 ->
+      let
+        u = getIntegerValue $ evaluateExpression environment expression1 evaluationMode
+        v = getIntegerValue $ evaluateExpression environment expression2 evaluationMode
+      in
+        Closure (EInt (u + v)) emptyEnvironment
+
+    ESub expression1 expression2 ->
+      let
+        u = getIntegerValue $ evaluateExpression environment expression1 evaluationMode
+        v = getIntegerValue $ evaluateExpression environment expression2 evaluationMode
+      in
+        Closure (EInt (u - v)) emptyEnvironment
+
+    ELt expression1 expression2 ->
+      let
+        u = getIntegerValue $ evaluateExpression environment expression1 evaluationMode
+        v = getIntegerValue $ evaluateExpression environment expression2 evaluationMode
+      in
+        IntegerValue (if u < v then 1 else 0)
+
+    EIf condition expression1 expression2 ->
+      let
+        conditionResult = evaluateExpression environment condition evaluationMode
+      in
+        if conditionResult == IntegerValue 1 then
+          evaluateExpression environment expression1 evaluationMode
+        else
+          evaluateExpression environment expression2 evaluationMode
+
+    EAbs _ _ -> Closure expression (Environment Map.empty $ variables environment)
+
+getIntegerValue :: Value -> Integer
+getIntegerValue (IntegerValue integer) = integer
+getIntegerValue (Closure (EInt integer) _) = integer
+getIntegerValue _ = error "Not possible to get integer value."
 
 createEmptyClosure :: Exp -> [Ident] -> Value
-createEmptyClosure e args = VClosure (absConv e args) emptyEnv
+createEmptyClosure expression args = Closure (lambdaConvert expression args) emptyEnvironment
 
-absConv :: Exp -> [Ident] -> Exp
-absConv e [] = e
-absConv e args = absConv (EAbs i e) (init args)
-  where i = last args
+lambdaConvert :: Exp -> [Ident] -> Exp
+lambdaConvert expression [] = expression
+lambdaConvert expression args = lambdaConvert (EAbs lastIdentifier expression) (init args)
+  where
+    lastIdentifier = last args
 
-data Env = Env {
-    functions :: Map.Map Ident Value,
-    variables :: Map.Map Ident Value
-} deriving (Show, Eq)
+emptyEnvironment :: Environment
+emptyEnvironment = Environment Map.empty Map.empty
 
-data Value = VInt Integer
-           | VClosure Exp Env deriving (Show, Eq)
+lookupIdentifier :: Ident -> Environment -> Value
+lookupIdentifier identifier@(Ident name) environment =
+  fromMaybe
+    (fromMaybe
+      (error $ "Identifier " ++ name ++ " not found. Environment: " ++ show environment)
+      (lookupFunction identifier environment))
+    (lookupVariable identifier environment)
 
-emptyEnv :: Env
-emptyEnv = Env Map.empty Map.empty
+lookupFunction :: Ident -> Environment -> Maybe Value
+lookupFunction identifier environment = Map.lookup identifier (functions environment)
 
-lookup :: Ident -> Env -> Value
-lookup i@(Ident s) env =
-    case lookupVar i env of
-        Nothing -> case lookupFun i env of
-                       Nothing -> error $ "Variable " ++ s ++ " not found. Env: " ++ show env
-                       Just v  -> v
-        Just v  -> v
+lookupVariable :: Ident -> Environment -> Maybe Value
+lookupVariable identifier environment = Map.lookup identifier (variables environment)
 
-lookupFun :: Ident -> Env -> Maybe Value
-lookupFun i env = Map.lookup i (functions env)
+updateFunction :: Environment -> Ident -> Value -> Environment
+updateFunction environment identifier value =
+  environment
+    {
+      functions = Map.insert identifier value (functions environment)
+    }
 
-lookupVar :: Ident -> Env -> Maybe Value
-lookupVar i env = Map.lookup i (variables env)
-
-updateFun :: Env -> Ident -> Value -> Env
-updateFun env i v = env { functions = Map.insert i v (functions env) }
-
-updateVar :: Env -> Ident -> Value -> Env
-updateVar env i v = env { variables = Map.insert i v (variables env) }
+updateVariable :: Environment -> Ident -> Value -> Environment
+updateVariable environment identifier value =
+  environment
+    {
+      variables = Map.insert identifier value (variables environment)
+    }
