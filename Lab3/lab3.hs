@@ -14,8 +14,8 @@ import CodeGenerator
 
 -- driver
 
-compileAndRunAsJava :: FilePath -> IO ()
-compileAndRunAsJava filePath =
+compileToJava :: FilePath -> IO ()
+compileToJava filePath =
   do
     let (dir, file) = splitFileName filePath
     s <- readFile filePath
@@ -34,17 +34,15 @@ compileAndRunAsJava filePath =
               exitFailure
           Ok t ->
             do
-              putStrLn $ printTree t
               let strippedFileName = dropExtension file
-              runCompiler dir strippedFileName $ compile strippedFileName t
+              createClassFile dir strippedFileName $ compile strippedFileName t
 
-runCompiler :: FilePath -> FilePath -> String -> IO ()
-runCompiler dir strippedFileName code =
+createClassFile :: FilePath -> FilePath -> String -> IO ()
+createClassFile dir strippedFileName code =
   do
     writeFile (combine dir (addExtension strippedFileName "j")) code
-    p <- runCommand ("java -jar jasmin.jar -d " ++ dir ++ " " ++ (dir ++ addExtension strippedFileName "j") ++ " > /dev/null")
+    p <- runCommand ("java -jar jasmin.jar -d " ++ dir ++ " " ++ (dir ++ addExtension strippedFileName "j"))
     waitForProcess p
-    runCommand ("java -cp " ++ dir ++ " " ++ strippedFileName)
     return ()
 
 main :: IO ()
@@ -52,7 +50,7 @@ main =
   do
     args <- getArgs
     case args of
-      [filePath] -> compileAndRunAsJava filePath
+      [filePath] -> compileToJava filePath
       _      ->
         do
           putStrLn "Usage: lab3 <SourceFile>"
