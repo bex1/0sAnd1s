@@ -37,9 +37,8 @@ evaluate evaluationMode source =
        exitFailure
     Ok tree ->
      do
-       putStrLn $ printTree tree
        let result = interpret tree evaluationMode
-       putStrLn $ "Result: " ++ show result
+       putStrLn $ show result
 
 defaultEvaluationMode :: EvaluationMode
 defaultEvaluationMode = CallByValue

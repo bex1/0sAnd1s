@@ -48,7 +48,7 @@ evaluateExpression environment expression evaluationMode =
       in
         evaluateExpression (Environment (functions environment) (variables environment')) expression' evaluationMode
 
-    EInt _ -> Closure expression emptyEnvironment -- maybe variables environment?
+    EInt _ -> Closure expression emptyEnvironment
 
     EApp expression1 expression2 ->
       let
@@ -95,14 +95,14 @@ evaluateExpression environment expression evaluationMode =
 getIntegerValue :: Value -> Integer
 getIntegerValue (IntegerValue integer) = integer
 getIntegerValue (Closure (EInt integer) _) = integer
-getIntegerValue _ = error "Not possible to get integer value."
+getIntegerValue _ = error "Not an integer value."
 
 createEmptyClosure :: Exp -> [Ident] -> Value
-createEmptyClosure expression args = Closure (lambdaConvert expression args) emptyEnvironment
+createEmptyClosure expression args = Closure (convertToAbstractionExpression expression args) emptyEnvironment
 
-lambdaConvert :: Exp -> [Ident] -> Exp
-lambdaConvert expression [] = expression
-lambdaConvert expression args = lambdaConvert (EAbs lastIdentifier expression) (init args)
+convertToAbstractionExpression :: Exp -> [Ident] -> Exp
+convertToAbstractionExpression expression [] = expression
+convertToAbstractionExpression expression args = convertToAbstractionExpression (EAbs lastIdentifier expression) (init args)
   where
     lastIdentifier = last args
 
@@ -113,7 +113,7 @@ lookupIdentifier :: Ident -> Environment -> Value
 lookupIdentifier identifier@(Ident name) environment =
   fromMaybe
     (fromMaybe
-      (error $ "Identifier " ++ name ++ " not found. Environment: " ++ show environment)
+      (error $ "Unknown identifier " ++ name)
       (lookupFunction identifier environment))
     (lookupVariable identifier environment)
 
